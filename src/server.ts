@@ -10,6 +10,7 @@ import { openDb } from './db/db.js';
 import { authRoutes, requireAuth } from './auth/plugin.js';
 import { apiRoutes } from './routes/api.js';
 import { assetRoutes } from './routes/assets.js';
+import { sfxRoutes } from './routes/sfx.js';
 import { sseRoutes } from './routes/sse.js';
 import { webhookRoutes } from './routes/webhook.js';
 import { spaRoutes } from './routes/spa.js';
@@ -84,6 +85,7 @@ export async function buildServer() {
     scope.addHook('preHandler', requireAuth);
     await scope.register(apiRoutes);
     await scope.register(assetRoutes);
+    await scope.register(sfxRoutes);
     await scope.register(sseRoutes);
   });
 

@@ -65,6 +65,15 @@ export const config = {
     priceFlashPer1M: Number(optional('DEEPSEEK_FLASH_USD_PER_1M', '0')),
   },
 
+  sfx: {
+    // Fábrica SFX (na casa, via WireGuard). Só o backend fala com isso.
+    baseUrl: optional('SFX_BASE_URL', 'http://10.8.0.2:8000'),
+    apiKey: optional('SFX_API_KEY', ''),
+    connectTimeoutMs: Number(optional('SFX_CONNECT_TIMEOUT_S', '5')) * 1000,
+    readTimeoutMs: Number(optional('SFX_READ_TIMEOUT_S', '900')) * 1000,
+    get libDir(): string { return resolve(config.storage.dataDir, 'sfx-library'); },
+  },
+
   storage: {
     dataDir: absDir(optional('DATA_DIR', './data')),
     repoDir: absDir(optional('REPO_DIR', '../')),
