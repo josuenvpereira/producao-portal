@@ -86,6 +86,7 @@ function AgentNode({ data }: NodeProps<NodeData>) {
           ))}
         </div>
       )}
+      <div className="oactlink">↗ ver na esteira</div>
     </div>
   );
 }
@@ -105,9 +106,10 @@ function buildSquads(org: OrgManifest, ov: Overview | null, navigate: (p: string
   const edges: Edge[] = [];
   const squads = org.squads ?? [];
   const allAgents = squads.flatMap((s) => s.agents);
-  const lead = squads.find((s) => s.id === 'gestao')?.agents ?? [];
-  const gerente = lead.find((a) => a.id.includes('gerente'));
-  const orq = lead.find((a) => a.id.includes('orquestrador'));
+  // Os dois "managers" (times separados): gerente_conteudo (mensageria) e
+  // orquestrador_msu (canal). Achados em qualquer squad — não hardcoda id.
+  const gerente = allAgents.find((a) => a.id.includes('gerente'));
+  const orq = allAgents.find((a) => a.id.includes('orquestrador'));
 
   const MID = 560;
   const GX = 180, OX = 940; // x da liderança/banda gov / ops
@@ -152,14 +154,15 @@ function buildSquads(org: OrgManifest, ov: Overview | null, navigate: (p: string
 
   // bandas (1 por squad) + cards de agente sob a banda
   squads.forEach((sq) => {
-    const color = sq.id === 'gestao' ? 'gov' : 'ops';
-    const bandX = sq.id === 'gestao' ? GX : OX;
+    const isCont = sq.id === 'conteudo';
+    const color = isCont ? 'gov' : 'ops';
+    const bandX = isCont ? GX : OX;
     const bandId = `band-${sq.id}`;
     nodes.push({
       id: bandId, type: 'band', position: { x: bandX + 40, y: 410 },
       data: { variant: color, emoji: '', name: sq.name.toUpperCase(), role: `${sq.agents.length} agente(s)` },
     });
-    const parent = sq.id === 'gestao' ? gerente?.id : orq?.id;
+    const parent = isCont ? gerente?.id : orq?.id;
     if (parent) edges.push({
       id: `${parent}-${bandId}`, source: parent, target: bandId, type: 'bezier',
       style: { stroke: `var(--c-${color})`, strokeWidth: 2 },
@@ -325,9 +328,9 @@ export function Organograma() {
           <div className="plabel">Legenda</div>
           <div className="oleg">
             <div><i style={{ background: 'var(--c-ceo)' }} /> CEO (Josué)</div>
-            <div><i style={{ background: 'var(--c-gov)' }} /> Gerente Canal MSU</div>
-            <div><i style={{ background: 'var(--c-ops)' }} /> Orquestrador MSU</div>
-            <div><i style={{ background: 'var(--c-dev)' }} /> Agentes / squads</div>
+            <div><i style={{ background: 'var(--c-gov)' }} /> Gerente Conteúdo (mensageria)</div>
+            <div><i style={{ background: 'var(--c-ops)' }} /> Orquestrador MSU (canal vídeo)</div>
+            <div><i style={{ background: 'var(--c-dev)' }} /> Agentes da pipeline</div>
           </div>
         </div>
 

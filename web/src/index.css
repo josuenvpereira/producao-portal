@@ -301,6 +301,9 @@ audio { width: 250px; height: 34px; }
 
 /* card de agente com chips */
 .oagent { padding: 12px 14px; }
+.oactlink { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--border);
+  color: var(--accent); font-size: 11px; font-weight: 600; }
+.onode.oagent:hover { border-color: var(--accent); }
 .oagent .ochips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
 .ochip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px;
   padding: 3px 7px; border-radius: 6px; background: var(--surface-2);
