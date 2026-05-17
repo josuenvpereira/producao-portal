@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { config } from '../config.js';
 import { runIndexer } from '../indexer.js';
+import { audit } from '../audit.js';
 
 // Webhook do GitHub (push / workflow_run). HMAC SHA-256 obrigatório
 // (x-hub-signature-256). Sem secret configurado → recusa (não aceita
@@ -37,6 +38,7 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
     }
     const event = req.headers['x-github-event'];
     if (event === 'push' || event === 'workflow_run') {
+      audit('webhook_accepted', { ip: req.ip, event });
       scheduleReindex(app);
       return reply.code(202).send({ ok: true, reindex: 'agendado' });
     }

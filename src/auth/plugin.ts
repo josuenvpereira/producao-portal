@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { config } from '../config.js';
 import { verifyKey } from './key.js';
 import { issueSession, clearSession, isAuthed } from './session.js';
+import { audit } from '../audit.js';
 
 // Rotas de sessão. @fastify/cookie e @fastify/rate-limit são registrados na
 // RAIZ (server.ts) p/ os decorators (req.cookies/unsignCookie) serem visíveis
@@ -25,15 +26,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         config.auth.accessKeyHash.length > 0 &&
         verifyKey(req.body.key, config.auth.accessKeyHash);
       if (!ok) {
-        req.log.warn({ ip: req.ip }, 'login falhou'); // logger redige a chave
+        audit('login_fail', { ip: req.ip });
         return reply.code(401).send({ error: 'credenciais inválidas' });
       }
+      audit('login_ok', { ip: req.ip });
       issueSession(reply);
       return reply.send({ ok: true });
     },
   );
 
-  app.post('/api/auth/logout', async (_req, reply) => {
+  app.post('/api/auth/logout', async (req, reply) => {
+    audit('logout', { ip: req.ip });
     clearSession(reply);
     return reply.send({ ok: true });
   });

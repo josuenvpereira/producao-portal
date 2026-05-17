@@ -2,6 +2,7 @@ import { createReadStream, statSync } from 'node:fs';
 import { resolve, sep, extname } from 'node:path';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { config } from '../config.js';
+import { audit } from '../audit.js';
 
 // Streaming de assets GATEADO (escopo protegido). Anti path-traversal idêntico
 // ao padrão de scripts/render_daemon.js: resolve + força pra dentro da raiz
@@ -55,6 +56,7 @@ export async function assetRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(404).send({ error: 'asset não encontrado' });
       }
 
+      audit('asset_served', { ip: req.ip, path: rel });
       reply.header('Content-Type', mime);
       reply.header('Cache-Control', 'private, max-age=300');
       reply.header('Accept-Ranges', 'bytes');
