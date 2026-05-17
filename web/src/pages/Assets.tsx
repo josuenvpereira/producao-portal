@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../api';
 import { useApi } from '../hooks';
 import { useRefreshTick } from '../refresh';
-import { Banner, Loading } from '../components';
+import { Panel, Banner, Loading } from '../components';
 
 const pubRel = (r: string) => r.replace(/^public\//, '');
 const KB = (b: number) => (b > 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`);
@@ -15,19 +15,30 @@ export function Assets() {
   const rows = data.assets.filter(
     (a) => !filter || a.rel_path.toLowerCase().includes(filter.toLowerCase()),
   );
+
   return (
     <>
-      <div className="topbar">
-        <div><h1>Assets</h1><div className="sub">{data.assets.length} arquivo(s) — áudio, imagens, brand (acesso gateado)</div></div>
-        <input
-          placeholder="filtrar…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          style={{ background: 'var(--panel)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px' }}
-        />
+      <div className="page-head">
+        <div>
+          <h1>Assets</h1>
+          <div className="sub">{data.assets.length} arquivo(s) — áudio, imagens, brand (acesso gateado)</div>
+        </div>
       </div>
       <Banner notes={data.degraded} />
-      <div className="card" style={{ padding: 0 }}>
+
+      <Panel
+        flush
+        title="Acervo"
+        sub="stream autenticado · anti path-traversal"
+        right={
+          <input
+            className="input"
+            placeholder="filtrar…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+        }
+      >
         <table className="tbl">
           <thead><tr><th>Episódio</th><th>Tipo</th><th>Arquivo</th><th>Tamanho</th><th>Preview</th></tr></thead>
           <tbody>
@@ -51,7 +62,7 @@ export function Assets() {
             {rows.length === 0 && <tr><td colSpan={5} className="muted">nenhum asset</td></tr>}
           </tbody>
         </table>
-      </div>
+      </Panel>
     </>
   );
 }

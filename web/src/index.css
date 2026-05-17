@@ -169,6 +169,11 @@ table { border-collapse: collapse; width: 100%; }
 .panel-head h3 { font-size: 14px; }
 .panel-head .sub { color: var(--muted); font-size: 12px; }
 .panel-body { padding: 20px; }
+.panel-body.flush { padding: 0; }
+.panel-body.flush .tbl th:first-child,
+.panel-body.flush .tbl td:first-child { padding-left: 20px; }
+.panel-body.flush .tbl th:last-child,
+.panel-body.flush .tbl td:last-child { padding-right: 20px; }
 
 /* ── Bars / Sparkline ────────────────────────────────────────────────────── */
 .bars { display: flex; flex-direction: column; gap: 10px; }
@@ -199,10 +204,10 @@ table { border-collapse: collapse; width: 100%; }
   margin: 26px 0 12px; }
 .banner { background: var(--warn-bg); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
   color: var(--warn); padding: 10px 14px; border-radius: var(--r-sm); font-size: 12px; margin-bottom: 16px; }
-.page-head, .topbar { display: flex; justify-content: space-between;
+.page-head { display: flex; justify-content: space-between;
   align-items: flex-end; gap: 16px; margin-bottom: 22px; }
-.page-head h1, .topbar h1 { font-size: 24px; }
-.page-head .sub, .topbar .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.page-head h1 { font-size: 24px; }
+.page-head .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
 
 /* ── Login ───────────────────────────────────────────────────────────────── */
 .login { display: grid; place-items: center; height: 100%; background: var(--bg); }

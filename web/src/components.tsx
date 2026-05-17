@@ -50,18 +50,15 @@ export function Kpi({
   label,
   value,
   foot,
-  sub,
   tone,
   chart,
 }: {
   label: string;
   value: ReactNode;
   foot?: ReactNode;
-  sub?: ReactNode; // alias retrocompatível (páginas ainda não repaginadas)
   tone?: 'pos' | 'neg' | 'warn';
   chart?: ReactNode;
 }) {
-  const bottom = foot ?? sub;
   return (
     <div className="card kpi">
       <div className="top">
@@ -71,7 +68,7 @@ export function Kpi({
         </div>
         {chart}
       </div>
-      {bottom != null && <div className={`foot ${tone ?? 'muted'}`}>{bottom}</div>}
+      {foot != null && <div className={`foot ${tone ?? 'muted'}`}>{foot}</div>}
     </div>
   );
 }
@@ -94,7 +91,19 @@ export function Bars({ data }: { data: Array<{ label: string; value: number }> }
   );
 }
 
-export function Panel({ title, sub, right, children }: { title: string; sub?: string; right?: ReactNode; children: ReactNode }) {
+export function Panel({
+  title,
+  sub,
+  right,
+  flush,
+  children,
+}: {
+  title: string;
+  sub?: string;
+  right?: ReactNode;
+  flush?: boolean; // sem padding no corpo (p/ tabelas edge-to-edge)
+  children: ReactNode;
+}) {
   return (
     <div className="card">
       <div className="panel-head">
@@ -104,7 +113,7 @@ export function Panel({ title, sub, right, children }: { title: string; sub?: st
         </div>
         {right}
       </div>
-      <div className="panel-body">{children}</div>
+      <div className={flush ? 'panel-body flush' : 'panel-body'}>{children}</div>
     </div>
   );
 }

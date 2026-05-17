@@ -30,7 +30,7 @@ export function Organograma() {
         data: { label: `▦ ${sq.name}` },
         draggable: false,
         selectable: false,
-        style: { background: 'transparent', border: 'none', color: '#9aa4b8', fontWeight: 700, width: 220 },
+        style: { background: 'transparent', border: 'none', color: 'var(--muted)', fontWeight: 700, width: 220 },
       });
       const sorted = [...sq.agents].sort((a, b) => orderOf(a.id) - orderOf(b.id));
       sorted.forEach((a, i) => {
@@ -39,9 +39,9 @@ export function Organograma() {
           position: { x: i * 230, y },
           data: { label: `${a.emoji}  ${a.name}` },
           style: {
-            background: '#131929',
-            color: '#f3f4f6',
-            border: '1px solid #232c40',
+            background: 'var(--surface)',
+            color: 'var(--text)',
+            border: '1px solid var(--border)',
             borderRadius: 10,
             fontSize: 12,
             width: 200,
@@ -62,7 +62,7 @@ export function Organograma() {
               target: t,
               animated: true,
               markerEnd: { type: MarkerType.ArrowClosed },
-              style: { stroke: '#60a5fa' },
+              style: { stroke: 'var(--accent)' },
             });
           }
         }
@@ -72,7 +72,7 @@ export function Organograma() {
               id: `${a.id}~>${s}`,
               source: a.id,
               target: s,
-              style: { stroke: '#9aa4b8', strokeDasharray: '4 4' },
+              style: { stroke: 'var(--muted)', strokeDasharray: '4 4' },
               markerEnd: { type: MarkerType.Arrow },
             });
           }
@@ -85,14 +85,14 @@ export function Organograma() {
   if (!data) return <Loading error={error} />;
   return (
     <>
-      <div className="topbar">
+      <div className="page-head">
         <div>
           <h1>Organograma</h1>
           <div className="sub">{data.project ?? 'Pipeline'} — data-driven (openclaw_workspaces/org.json)</div>
         </div>
       </div>
       <Banner notes={data.degraded} />
-      <div className="card" style={{ height: '72vh', padding: 0 }}>
+      <div className="card" style={{ height: '72vh', overflow: 'hidden' }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -101,7 +101,7 @@ export function Organograma() {
           nodesConnectable={false}
           nodesDraggable
         >
-          <Background color="#232c40" gap={22} />
+          <Background color="var(--border)" gap={22} />
           <Controls showInteractive={false} />
         </ReactFlow>
       </div>
