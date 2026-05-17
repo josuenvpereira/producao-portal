@@ -17,7 +17,11 @@ export async function spaRoutes(app: FastifyInstance): Promise<void> {
     return;
   }
 
-  await app.register(fastifyStatic, { root: webDist, wildcard: false });
+  // wildcard true (default): serve TODOS os arquivos (inclui /assets/*.js|css)
+  // com o MIME correto. Faltou arquivo → 404 → notFoundHandler → index.html
+  // (SPA client-side routing). wildcard:false NÃO serve aninhados → o JS caía
+  // no fallback como text/html e o browser recusava o módulo (tela branca).
+  await app.register(fastifyStatic, { root: webDist });
 
   app.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith('/api') || req.method !== 'GET') {
