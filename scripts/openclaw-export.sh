@@ -17,7 +17,11 @@ OUT="${PORTAL_EXPORT_DIR:-/docker/openclaw-0wr6/portal-export}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-oc() { docker exec "$OC" openclaw "$@" 2>/dev/null; }
+# ⛔ REGRA DE OURO: `docker exec <oc> openclaw ...` roda como ROOT dentro do
+# container, tranca /tmp em 700 root e DERRUBA o gateway do OpenClaw (WhatsApp).
+# Este script roda em cron */5 — sem isto, mataria o gateway a cada 5 min.
+# SEMPRE invocar a CLI via `runuser -u node --` (usuário do gateway). NÃO reverter.
+oc() { docker exec "$OC" runuser -u node -- openclaw "$@" 2>/dev/null; }
 # escreve atômico só se a saída for não-vazia (não zera snapshot bom em falha)
 put() { # put <arquivo> < conteúdo(stdin)
   local f="$1" t="$TMP/$(basename "$1")"
@@ -32,7 +36,7 @@ oc agents list | put agents.txt
 oc cron list --all --json | put cron.json
 
 # 2. histórico de execução por job (= esteira de Comunicação)
-docker exec "$OC" openclaw cron list --all --json 2>/dev/null > "$TMP/cron.json" || true
+docker exec "$OC" runuser -u node -- openclaw cron list --all --json 2>/dev/null > "$TMP/cron.json" || true
 JOB_IDS="$(python3 -c 'import sys,json;print("\n".join(j["id"] for j in json.load(open(sys.argv[1])).get("jobs",[])))' "$TMP/cron.json" 2>/dev/null || true)"
 for id in $JOB_IDS; do
   oc cron runs --id "$id" --limit 50 > "$TMP/run-$id.json" 2>/dev/null || true

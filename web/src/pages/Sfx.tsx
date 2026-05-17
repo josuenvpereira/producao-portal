@@ -6,6 +6,20 @@ import { Loading, fmtDate } from '../components';
 
 type Kind = 'sfx' | 'bed' | 'vocal';
 
+// Presets de voz p/ OmniVoice — a fábrica NÃO expõe catálogo de vozes (só
+// bed_presets), então a lista é curada aqui. "Personalizado…" libera o
+// instruct livre. Editar/acrescentar à vontade (label + value).
+const VOICE_PRESETS: { label: string; value: string }[] = [
+  { label: 'Padrão da fábrica (recomendado)', value: '' },
+  { label: 'Masc · PT-BR · narrador claro', value: 'male, brazilian portuguese, clear neutral narrator' },
+  { label: 'Masc · PT-BR · enérgico / hype', value: 'male, brazilian portuguese, energetic hype narrator' },
+  { label: 'Masc · PT-BR · sério / analítico', value: 'male, brazilian portuguese, calm serious analytical narrator' },
+  { label: 'Masc · PT-BR · grave / dramático', value: 'male, brazilian portuguese, deep dramatic cinematic narrator' },
+  { label: 'Fem · PT-BR · clara / neutra', value: 'female, brazilian portuguese, clear neutral narrator' },
+  { label: 'Fem · PT-BR · enérgica', value: 'female, brazilian portuguese, energetic narrator' },
+];
+const SPEEDS = ['0.8', '0.9', '1.0', '1.1', '1.2', '1.25'];
+
 function StatusHeader({ s }: { s: SfxStatus | null }) {
   if (!s) return <span className="badge b-idle">checando…</span>;
   if (!s.reachable || s.state === 'offline')
@@ -32,7 +46,7 @@ export function Sfx() {
   // form state (defaults do §4)
   const [sfxF, setSfxF] = useState({ prompt: '', lang: 'pt', duration: 5, steps: 150, seed: '' });
   const [bedF, setBedF] = useState({ prompt: '', name: '', audio_duration: 60, seed: '' });
-  const [vocF, setVocF] = useState({ text: '', language: 'pt', instruct: '', speed: '' });
+  const [vocF, setVocF] = useState({ text: '', language: 'pt', instruct: '', speed: '1.0', custom: false });
 
   // poll de status a cada 20s
   const rs = useRef(reloadStatus);
@@ -177,11 +191,35 @@ export function Sfx() {
               <textarea {...inp} rows={3} placeholder="texto da narração (PT-BR)"
                 value={vocF.text} onChange={(e) => setVocF({ ...vocF, text: e.target.value })} />
               <div className="row">
-                <input className="input" placeholder='instruct (ex.: "male, portuguese accent")'
-                  value={vocF.instruct} onChange={(e) => setVocF({ ...vocF, instruct: e.target.value })} style={{ flex: 1 }} />
-                <input className="input" placeholder="speed" value={vocF.speed}
-                  onChange={(e) => setVocF({ ...vocF, speed: e.target.value })} style={{ width: 90 }} />
+                <label className="muted" style={{ flex: 1 }}>voz
+                  <select className="input" style={{ width: '100%' }}
+                    value={vocF.custom ? '__custom__' : vocF.instruct}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === '__custom__') setVocF({ ...vocF, custom: true, instruct: '' });
+                      else setVocF({ ...vocF, custom: false, instruct: v });
+                    }}>
+                    {VOICE_PRESETS.map((p) => (
+                      <option key={p.label} value={p.value}>{p.label}</option>
+                    ))}
+                    <option value="__custom__">Personalizado…</option>
+                  </select>
+                </label>
+                <label className="muted" style={{ width: 120 }}>velocidade
+                  <select className="input" style={{ width: '100%' }} value={vocF.speed}
+                    onChange={(e) => setVocF({ ...vocF, speed: e.target.value })}>
+                    {SPEEDS.map((s) => (
+                      <option key={s} value={s}>{s === '1.0' ? '1.0× (padrão)' : s + '×'}</option>
+                    ))}
+                  </select>
+                </label>
               </div>
+              {vocF.custom && (
+                <input className="input" autoFocus
+                  placeholder='instruct livre (ex.: "male, portuguese accent")'
+                  value={vocF.instruct}
+                  onChange={(e) => setVocF({ ...vocF, instruct: e.target.value })} />
+              )}
             </div>
           )}
 
@@ -195,16 +233,9 @@ export function Sfx() {
           </div>}
           {err && <div className="banner" style={{ marginTop: 12 }}>{err}</div>}
 
-          {result && (
-            <div className="card pad" style={{ marginTop: 14 }}>
-              <audio controls src={result.url} style={{ width: '100%' }} />
-              {result.promptEn && (
-                <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                  gerado a partir de (EN): <i>{result.promptEn}</i>
-                </div>
-              )}
-              <a className="btn" style={{ marginTop: 10, display: 'inline-block' }}
-                href={result.url} download={`sfx-${kind}.mp3`}>↓ baixar</a>
+          {result && !err && (
+            <div className="muted" style={{ marginTop: 12, fontSize: 13 }}>
+              ✓ Áudio gerado — disponível na <b>Biblioteca</b> ao lado (tocar e baixar por lá).
             </div>
           )}
         </div>
