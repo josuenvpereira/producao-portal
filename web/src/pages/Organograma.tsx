@@ -173,7 +173,9 @@ function buildSquads(org: OrgManifest, ov: Overview | null, navigate: (p: string
         position: { x: x - 110 + (ai % 2) * 280, y: 540 + Math.floor(ai / 2) * 170 },
         data: {
           variant: 'plain', emoji: a.emoji, name: a.name, role: short(a.role),
-          chips: (a.handsOffTo ?? []).slice(0, 3),
+          chips: [a.model ? a.model.replace('deepseek-', '') : '', ...(a.handsOffTo ?? [])]
+            .filter(Boolean)
+            .slice(0, 3),
           onOpen: () => navigate('/esteira'),
         },
       });
@@ -231,7 +233,7 @@ function buildAgentes(org: OrgManifest, navigate: (p: string) => void) {
       id: a.id, type: 'agent', position: { x: i * 250, y: (i % 2) * 130 },
       data: {
         variant: 'plain', emoji: a.emoji, name: a.name, role: short(a.role),
-        chips: (a.handsOffTo ?? []).map((h) => h.replace(/_/g, '-')),
+        chips: [a.model ? a.model.replace('deepseek-', '') : '', ...(a.handsOffTo ?? [])].filter(Boolean),
         onOpen: () => navigate('/esteira'),
       },
     });

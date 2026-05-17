@@ -116,6 +116,7 @@ export interface OrgAgent {
   emoji: string;
   role: string;
   branch?: string;
+  model?: string;
   lead?: boolean;
   supervisor?: boolean;
   handsOffTo?: string[];
@@ -124,7 +125,7 @@ export interface OrgAgent {
 export interface OrgManifest {
   schemaVersion: number;
   project?: string;
-  ceo?: { id: string; name: string; role: string; emoji: string; branch?: string };
+  ceo?: { id: string; name: string; role: string; emoji: string; branch?: string; model?: string };
   pipeline?: string[];
   states?: string[];
   squads: Array<{ id: string; name: string; agents: OrgAgent[] }>;
