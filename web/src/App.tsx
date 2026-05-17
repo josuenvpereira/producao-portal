@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, useParams } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  NavLink,
+  useParams,
+  useLocation,
+} from 'react-router-dom';
 import { api } from './api';
 import { useSse } from './hooks';
+import { useTheme } from './theme';
 import { RefreshCtx } from './refresh';
 import { Login } from './Login';
 import { Overview } from './pages/Overview';
@@ -11,43 +19,99 @@ import { Custos } from './pages/Custos';
 import { Organograma } from './pages/Organograma';
 import { Assets } from './pages/Assets';
 
+const CRUMB: Record<string, string> = {
+  '/': 'Overview',
+  '/esteira': 'Esteira',
+  '/episodios': 'Episódios',
+  '/custos': 'Custos',
+  '/organograma': 'Organograma',
+  '/assets': 'Assets',
+};
+
+function Appbar({ onToggleTheme, theme }: { onToggleTheme: () => void; theme: string }) {
+  const { pathname } = useLocation();
+  const label = pathname.startsWith('/episodios/') ? 'Episódio' : (CRUMB[pathname] ?? 'Overview');
+  return (
+    <div className="appbar">
+      <div className="crumb">
+        Produção <span style={{ opacity: 0.5 }}>›</span> <b>{label}</b>
+      </div>
+      <div className="row">
+        <span className="chip">ao vivo · SSE</span>
+        <button
+          className="btn icon"
+          onClick={onToggleTheme}
+          title={theme === 'light' ? 'Tema escuro' : 'Tema claro'}
+          aria-label="Alternar tema"
+        >
+          {theme === 'light' ? '🌙' : '☀️'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Shell() {
   const [tick, setTick] = useState(0);
   useSse(() => setTick((t) => t + 1));
+  const [theme, toggleTheme] = useTheme();
   const link = ({ isActive }: { isActive: boolean }) => 'navlink' + (isActive ? ' active' : '');
+
   return (
     <RefreshCtx.Provider value={tick}>
       <div className="app">
         <nav className="sidebar">
-          <div className="brand">
-            <span style={{ fontSize: 22 }}>📦</span>
-            <span>
+          <div className="org">
+            <div className="logo">P</div>
+            <div>
               <b>Produção</b>
               <small>My Storage Units</small>
-            </span>
+            </div>
           </div>
-          <NavLink to="/" end className={link}>📊 Dashboard</NavLink>
-          <NavLink to="/esteira" className={link}>🛠️ Esteira</NavLink>
-          <NavLink to="/episodios" className={link}>🎬 Episódios</NavLink>
-          <NavLink to="/custos" className={link}>💰 Custos</NavLink>
-          <NavLink to="/organograma" className={link}>🧭 Organograma</NavLink>
-          <NavLink to="/assets" className={link}>🗂️ Assets</NavLink>
+
+          <div className="nav-group">Principal</div>
+          <NavLink to="/" end className={link}><span className="ic">▦</span> Dashboard</NavLink>
+          <NavLink to="/esteira" className={link}><span className="ic">▤</span> Esteira</NavLink>
+          <NavLink to="/episodios" className={link}><span className="ic">▷</span> Episódios</NavLink>
+
+          <div className="nav-group">Custos & Org</div>
+          <NavLink to="/custos" className={link}><span className="ic">$</span> Custos</NavLink>
+          <NavLink to="/organograma" className={link}><span className="ic">⌥</span> Organograma</NavLink>
+
+          <div className="nav-group">Acervo</div>
+          <NavLink to="/assets" className={link}><span className="ic">▣</span> Assets</NavLink>
+
           <div className="spacer" />
-          <button className="logout" onClick={() => api.logout().then(() => location.reload())}>
-            ⎋ Sair
-          </button>
+          <div className="usercard">
+            <div className="av">O</div>
+            <div>
+              <b style={{ fontSize: 13 }}>Operador</b>
+              <small>Squad MSU</small>
+            </div>
+            <button
+              className="lo"
+              title="Sair"
+              onClick={() => api.logout().then(() => location.reload())}
+            >
+              ⎋
+            </button>
+          </div>
         </nav>
-        <main className="main">
-          <Routes>
-            <Route path="/" element={<Overview />} />
-            <Route path="/esteira" element={<Esteira />} />
-            <Route path="/episodios" element={<Esteira />} />
-            <Route path="/episodios/:id" element={<EpisodeRoute />} />
-            <Route path="/custos" element={<Custos />} />
-            <Route path="/organograma" element={<Organograma />} />
-            <Route path="/assets" element={<Assets />} />
-          </Routes>
-        </main>
+
+        <div className="main">
+          <Appbar onToggleTheme={toggleTheme} theme={theme} />
+          <div className="content">
+            <Routes>
+              <Route path="/" element={<Overview />} />
+              <Route path="/esteira" element={<Esteira />} />
+              <Route path="/episodios" element={<Esteira />} />
+              <Route path="/episodios/:id" element={<EpisodeRoute />} />
+              <Route path="/custos" element={<Custos />} />
+              <Route path="/organograma" element={<Organograma />} />
+              <Route path="/assets" element={<Assets />} />
+            </Routes>
+          </div>
+        </div>
       </div>
     </RefreshCtx.Provider>
   );

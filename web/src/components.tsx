@@ -19,12 +19,59 @@ export function StateBadge({ state }: { state: string | null }) {
   return <span className={`badge ${cls}`}>{state}</span>;
 }
 
-export function Kpi({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: 'pos' | 'neg' | 'warn' }) {
+// Mini barras verticais no canto do KPI (igual ao modelo).
+export function MiniBars({ values, w = 78, h = 40 }: { values: number[]; w?: number; h?: number }) {
+  const max = Math.max(1, ...values);
+  const n = values.length || 1;
+  const bw = w / (n * 1.7);
+  const gap = bw * 0.7;
+  return (
+    <svg width={w} height={h} aria-hidden>
+      {values.map((v, i) => {
+        const bh = Math.max(2, (v / max) * (h - 4));
+        const last = i === values.length - 1;
+        return (
+          <rect
+            key={i}
+            x={i * (bw + gap)}
+            y={h - bh}
+            width={bw}
+            height={bh}
+            rx={1.5}
+            fill={last ? 'var(--chart)' : 'var(--chart-soft)'}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+export function Kpi({
+  label,
+  value,
+  foot,
+  sub,
+  tone,
+  chart,
+}: {
+  label: string;
+  value: ReactNode;
+  foot?: ReactNode;
+  sub?: ReactNode; // alias retrocompatível (páginas ainda não repaginadas)
+  tone?: 'pos' | 'neg' | 'warn';
+  chart?: ReactNode;
+}) {
+  const bottom = foot ?? sub;
   return (
     <div className="card kpi">
-      <div className="label">{label}</div>
-      <div className="value">{value}</div>
-      {sub != null && <div className={`delta ${tone ?? ''}`}>{sub}</div>}
+      <div className="top">
+        <div>
+          <div className="label">{label}</div>
+          <div className="value">{value}</div>
+        </div>
+        {chart}
+      </div>
+      {bottom != null && <div className={`foot ${tone ?? 'muted'}`}>{bottom}</div>}
     </div>
   );
 }
@@ -33,15 +80,31 @@ export function Bars({ data }: { data: Array<{ label: string; value: number }> }
   const max = Math.max(1, ...data.map((d) => d.value));
   return (
     <div className="bars">
+      {data.length === 0 && <span className="muted">sem dados</span>}
       {data.map((d) => (
         <div className="bar-row" key={d.label}>
-          <span className="muted">{d.label}</span>
+          <span className="muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
           <div className="bar-track">
             <div className="bar-fill" style={{ width: `${(d.value / max) * 100}%` }} />
           </div>
           <span className="mono" style={{ textAlign: 'right' }}>{d.value}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+export function Panel({ title, sub, right, children }: { title: string; sub?: string; right?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="card">
+      <div className="panel-head">
+        <div>
+          <h3>{title}</h3>
+          {sub && <div className="sub">{sub}</div>}
+        </div>
+        {right}
+      </div>
+      <div className="panel-body">{children}</div>
     </div>
   );
 }
