@@ -35,29 +35,30 @@
   color-scheme: light;
 }
 [data-theme='dark'] {
-  --bg: #0b0f19;
-  --surface: #121826;
-  --surface-2: #171f30;
-  --surface-3: #1d2740;
-  --border: #232c40;
-  --border-strong: #2d3956;
-  --text: #f3f4f6;
-  --text-2: #c7cedb;
-  --muted: #93a0b8;
-  --accent: #60a5fa;
-  --primary: #f3f4f6;
-  --primary-text: #0b0f19;
-  --success: #34d399;
-  --success-bg: #0e2a20;
-  --warn: #fbbf24;
-  --warn-bg: #2a230c;
-  --danger: #f87171;
-  --danger-bg: #2a1212;
-  --chart: #60a5fa;
-  --chart-soft: #232c40;
-  --ring: rgba(96, 165, 250, 0.4);
+  /* Cyber Obsidian — zinc quase-preto + indigo (Vercel/Linear/Supabase) */
+  --bg: #09090b;
+  --surface: #18181b;
+  --surface-2: #1f1f23;
+  --surface-3: #27272a;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --text: #fafafa;
+  --text-2: #e4e4e7;
+  --muted: #a1a1aa;
+  --accent: #6366f1;
+  --primary: #fafafa;
+  --primary-text: #09090b;
+  --success: #22c55e;
+  --success-bg: #0c2417;
+  --warn: #eab308;
+  --warn-bg: #271f06;
+  --danger: #ef4444;
+  --danger-bg: #2a1213;
+  --chart: #6366f1;
+  --chart-soft: #27272a;
+  --ring: rgba(99, 102, 241, 0.4);
   --shadow-sm: none;
-  --shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+  --shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
   color-scheme: dark;
 }
 
