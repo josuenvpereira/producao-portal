@@ -24,6 +24,13 @@ export function Esteira() {
         </div>
       </div>
       <Banner notes={data.degraded} />
+      <div className="card pad" style={{ marginBottom: 16, fontSize: 12 }}>
+        <b>Escopo:</b> esta esteira cobre o <b>Canal MSU · Vídeo</b>
+        (pipeline-state do orquestrador). A esteira de{' '}
+        <b>Conteúdo · Mensageria</b> (gerente_conteudo) roda por <b>cron no
+        OpenClaw</b> e <b>ainda não está conectada</b> — fonte de log a definir
+        (adapter CronLog pendente).
+      </div>
 
       <Panel
         flush
