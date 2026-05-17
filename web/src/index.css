@@ -28,6 +28,12 @@
   --ring: rgba(37, 99, 235, 0.35);
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
   --shadow: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+  /* cores de ramo do organograma (níveis/squads) */
+  --c-ceo: #0ea5e9;
+  --c-gov: #8b5cf6;
+  --c-ops: #f59e0b;
+  --c-dev: #14b8a6;
+  --c-con: #ec4899;
   --r-sm: 8px;
   --r: 12px;
   --r-lg: 16px;
@@ -59,6 +65,11 @@
   --ring: rgba(99, 102, 241, 0.4);
   --shadow-sm: none;
   --shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  --c-ceo: #22d3ee;
+  --c-gov: #a78bfa;
+  --c-ops: #fbbf24;
+  --c-dev: #2dd4bf;
+  --c-con: #f472b6;
   color-scheme: dark;
 }
 
@@ -226,3 +237,92 @@ table { border-collapse: collapse; width: 100%; }
 audio { width: 250px; height: 34px; }
 .thumb { width: 92px; height: 52px; object-fit: cover; border-radius: 6px;
   border: 1px solid var(--border); background: var(--surface-3); }
+
+/* ── Organograma (React Flow custom) ─────────────────────────────────────── */
+.orgwrap { position: relative; height: 76vh; border-radius: var(--r-lg);
+  overflow: hidden; border: 1px solid var(--border); background: var(--bg); }
+.react-flow__node { background: transparent; border: none; box-shadow: none; }
+.react-flow__node-default { padding: 0; width: auto; }
+.react-flow__handle { opacity: 0; }
+.react-flow__attribution { display: none; }
+.react-flow__controls { box-shadow: var(--shadow); border-radius: var(--r-sm); overflow: hidden; }
+.react-flow__controls-button {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  color: var(--text); width: 30px; height: 30px;
+}
+.react-flow__controls-button:hover { background: var(--surface-2); }
+.react-flow__controls-button svg { fill: var(--text); }
+.react-flow__minimap { background: var(--surface) !important;
+  border: 1px solid var(--border); border-radius: var(--r-sm); }
+
+/* nó base + glow por nível */
+.onode {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; width: 252px; color: var(--text);
+  font-size: 12px; cursor: grab;
+}
+.onode .ohead { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.onode .oav { width: 32px; height: 32px; border-radius: 9px; display: grid;
+  place-items: center; font-size: 17px; background: var(--surface-3);
+  border: 1px solid var(--border); flex: none; }
+.onode .ohead > div:last-child { min-width: 0; }
+.onode .oname { font-weight: 700; font-size: 13px; line-height: 1.15;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.onode .orole { color: var(--muted); font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.04em; margin-top: 3px; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.onode.lvl-ceo { border-color: var(--c-ceo);
+  box-shadow: 0 0 0 1px var(--c-ceo), 0 0 30px -8px var(--c-ceo); }
+.onode.lvl-ceo .oav { box-shadow: 0 0 0 1px var(--c-ceo); }
+.onode.lvl-gov { border-color: var(--c-gov); box-shadow: 0 0 26px -10px var(--c-gov); }
+.onode.lvl-ops { border-color: var(--c-ops); box-shadow: 0 0 26px -10px var(--c-ops); }
+
+.ostats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+  background: var(--border); border-top: 1px solid var(--border); }
+.ostat { background: var(--surface); padding: 9px 12px; }
+.ostat b { font-family: "Roboto Mono", monospace; font-size: 16px; font-weight: 700; }
+.ostat span { display: block; color: var(--muted); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px; }
+.onode .oact { display: block; width: calc(100% - 20px); margin: 10px;
+  text-align: center; padding: 7px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-strong); color: var(--text-2);
+  font-size: 11px; font-weight: 600; background: var(--surface-2); }
+.onode .oact:hover { border-color: var(--accent); color: var(--text); }
+
+/* banda de squad (pill com cor) */
+.oband {
+  padding: 8px 18px; border-radius: 999px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; text-align: center;
+  background: var(--surface); border: 1px solid currentColor; min-width: 150px;
+}
+.oband small { display: block; font-weight: 500; letter-spacing: 0.02em;
+  color: var(--muted); text-transform: none; margin-top: 2px; }
+
+/* card de agente com chips */
+.oagent { padding: 12px 14px; }
+.oagent .ochips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.ochip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px;
+  padding: 3px 7px; border-radius: 6px; background: var(--surface-2);
+  border: 1px solid var(--border); color: var(--muted); }
+
+/* painel lateral flutuante */
+.opanel {
+  position: absolute; top: 16px; left: 16px; z-index: 6; width: 244px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow); padding: 18px;
+}
+.opanel h2 { font-size: 16px; }
+.opanel .ph { color: var(--muted); font-size: 11px; margin: 2px 0 16px; }
+.opanel .plabel { color: var(--muted); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em; margin: 14px 0 7px; }
+.opanel .seg { width: 100%; }
+.opanel .seg button { flex: 1; }
+.opanel select { width: 100%; background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  padding: 8px 10px; font-size: 12px; }
+.opanel .prow { display: flex; gap: 8px; margin-top: 14px; }
+.opanel .prow .btn { flex: 1; justify-content: center; }
+.oleg { display: flex; flex-direction: column; gap: 7px; margin-top: 8px; }
+.oleg div { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-2); }
+.oleg i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
