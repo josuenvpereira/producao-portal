@@ -1,0 +1,11 @@
+node_modules
+web/node_modules
+dist
+web/dist
+data
+vault
+.env
+.env.local
+*.log
+docs
+**/*.test.ts

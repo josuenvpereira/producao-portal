@@ -1,0 +1,61 @@
+# Portal de produção no MESMO VPS do OpenClaw, atrás do MESMO Traefik
+# (TLS Let's Encrypt automático — "segurança igual openclaw" no transporte).
+#
+# Antes de subir, preencha .env (veja .env.example + docs/DEPLOY.md):
+#   PORTAL_TRAEFIK_NETWORK   = rede externa do Traefik (docker inspect do
+#                              container OpenClaw → .NetworkSettings.Networks)
+#   PORTAL_TRAEFIK_CERTRESOLVER = nome do certresolver do Traefik (ex.:
+#                              "letsencrypt" — confira a config do Traefik)
+#   PORTAL_REPO_DIR          = caminho no host do repo que o supervisor opera
+#                              (pipeline-state/, public/, openclaw_workspaces/)
+
+services:
+  portal:
+    build: .
+    image: msu-producao-portal:latest
+    container_name: msu-producao-portal
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /data
+      REPO_DIR: /repo
+      PORT: "8080"
+    volumes:
+      - portal-data:/data
+      - ${PORTAL_REPO_DIR}:/repo:ro   # repo do supervisor — SOMENTE LEITURA
+    read_only: true                    # rootfs imutável (só /data e /tmp escrevem)
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    networks:
+      - traefik
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${PORTAL_TRAEFIK_NETWORK}
+      - traefik.http.routers.msu-portal.rule=Host(`producao.jotaene.ia.br`)
+      - traefik.http.routers.msu-portal.entrypoints=websecure
+      - traefik.http.routers.msu-portal.tls=true
+      - traefik.http.routers.msu-portal.tls.certresolver=${PORTAL_TRAEFIK_CERTRESOLVER}
+      - traefik.http.services.msu-portal.loadbalancer.server.port=8080
+      # Redireciona http→https (mesmo padrão do OpenClaw)
+      - traefik.http.routers.msu-portal-web.rule=Host(`producao.jotaene.ia.br`)
+      - traefik.http.routers.msu-portal-web.entrypoints=web
+      - traefik.http.routers.msu-portal-web.middlewares=msu-portal-https
+      - traefik.http.middlewares.msu-portal-https.redirectscheme.scheme=https
+
+volumes:
+  portal-data:
+
+networks:
+  traefik:
+    external: true
+    name: ${PORTAL_TRAEFIK_NETWORK}
