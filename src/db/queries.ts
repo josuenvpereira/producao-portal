@@ -133,6 +133,16 @@ export function costSummary(db: Db) {
   };
 }
 
+export function assetsList(db: Db) {
+  const rows = db
+    .prepare(
+      `SELECT episode_id, kind, rel_path, bytes, mtime FROM assets
+       ORDER BY episode_id, kind, rel_path`,
+    )
+    .all();
+  return { assets: rows, degraded: degradedNotes(db) };
+}
+
 export function orgManifest(): unknown {
   // org.json é versionado (gerado por scripts/generate_org_manifest.js).
   try {

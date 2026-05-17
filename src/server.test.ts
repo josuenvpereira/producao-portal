@@ -72,6 +72,19 @@ describe('auth + API gate', () => {
     expect(ov.json()).toHaveProperty('kpis');
   });
 
+  it('endpoints read respondem 200 autenticado', async () => {
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/session',
+      payload: { key: TEST_KEY },
+    });
+    const cookie = cookieHeader(login);
+    for (const url of ['/api/pipeline', '/api/cost/summary', '/api/assets', '/api/org']) {
+      const res = await app.inject({ method: 'GET', url, headers: { cookie } });
+      expect(res.statusCode, url).toBe(200);
+    }
+  });
+
   it('healthz é público', async () => {
     const res = await app.inject({ method: 'GET', url: '/healthz' });
     expect(res.statusCode).toBe(200);
