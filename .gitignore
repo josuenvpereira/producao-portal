@@ -1,0 +1,18 @@
+# Deps & build
+node_modules/
+dist/
+web/dist/
+
+# Segredos — NUNCA versionar (só .env.example vai pro git)
+.env
+.env.local
+
+# Read-model + vault de artifacts (dados derivados, regeneráveis)
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+vault/
+
+# Logs
+*.log
