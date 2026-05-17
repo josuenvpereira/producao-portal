@@ -32,8 +32,13 @@ Este repo = **código + CD do portal**. Em runtime, no VPS, ele ainda
 ├── docs/           # DEPLOY_HANDOFF.md (deploy faseado) · DEPLOY.md · RUNBOOK.md · adr/
 ├── org.json        # roster (gerado por scripts/generate_org_manifest.js)
 ├── Dockerfile · docker-compose.yml · .env.example
-└── .github/workflows/  portal-ci.yml · deploy.yml (CD: push main → VPS)
+├── CLAUDE.md       # contexto/regras p/ sessões Claude (LER antes de mexer)
+└── .github/workflows/  ci.yml (typecheck/test/build) · deploy.yml (CD: push main → VPS)
 ```
+
+> **Trabalhando neste repo (humano ou Claude): leia o `CLAUDE.md`** — tem a
+> arquitetura, as fontes de dados (modelo 2-repos + exporter OpenClaw + SFX),
+> deploy/CD, convenções e os "gotchas" que custaram caro (não repetir).
 
 ## Dev (local)
 
