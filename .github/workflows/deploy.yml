@@ -1,0 +1,56 @@
+name: deploy
+
+# CD: push na main → atualiza producao.jotaene.ia.br no VPS Hostinger via SSH.
+# Pull-based no VPS é mais simples em segredos, mas o Josué quer atualização
+# IMEDIATA no push → SSH push-deploy. Se os segredos do VPS ainda não estão
+# configurados (1º push, antes do deploy inicial), o job PULA limpo (não falha).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-producao
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checar se o CD está configurado (segredos do VPS)
+        id: cfg
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          if [ -n "$VPS_HOST" ]; then echo "ok=true" >> "$GITHUB_OUTPUT";
+          else echo "ok=false" >> "$GITHUB_OUTPUT";
+               echo "::notice::CD ainda não configurado (sem VPS_HOST). Pulando — veja docs/DEPLOY_SECRETS.md."; fi
+
+      - name: Deploy via SSH (git pull + docker compose + healthz)
+        if: steps.cfg.outputs.ok == 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          command_timeout: 18m
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.VPS_PORTAL_DIR }}"
+            git fetch --quiet origin main
+            git reset --hard origin/main          # deploy = espelho exato da main
+            docker compose build portal
+            docker compose up -d portal
+            # espera o healthcheck (até ~90s) antes de declarar sucesso
+            for i in $(seq 1 18); do
+              if curl -fsS https://producao.jotaene.ia.br/healthz >/dev/null 2>&1; then
+                echo "healthz OK"; exit 0; fi
+              sleep 5
+            done
+            echo "::error::healthz não respondeu após deploy"; exit 1

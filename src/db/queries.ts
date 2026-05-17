@@ -173,11 +173,10 @@ export function assetsList(db: Db) {
 }
 
 export function orgManifest(): unknown {
-  // org.json é versionado (gerado por scripts/generate_org_manifest.js).
+  // org.json roster-driven, versionado na raiz deste repo (standalone).
   try {
-    const p = join(config.storage.repoDir, 'openclaw_workspaces', 'org.json');
-    return JSON.parse(readFileSync(p, 'utf8'));
+    return JSON.parse(readFileSync(config.org.manifestPath, 'utf8'));
   } catch {
-    return { schemaVersion: 1, squads: [], degraded: ['org.json ausente — rode generate_org_manifest.js'] };
+    return { schemaVersion: 1, squads: [], degraded: ['org.json ausente — rode scripts/generate_org_manifest.js'] };
   }
 }

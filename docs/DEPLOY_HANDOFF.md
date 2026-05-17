@@ -4,11 +4,36 @@ Documento **autocontido** para a sessão que tem **SSH no Hostinger**. Você vai
 **avaliar a melhor forma**, escrever um **script faseado** e **testar cada
 fase**. Tudo que você precisa está aqui. Não assuma contexto prévio.
 
-> Companheiros (leia também, no repo): `portal/docs/DEPLOY.md` (guia base),
-> `portal/docs/RUNBOOK.md` (operação), `portal/docker-compose.yml`,
-> `portal/.env.example`, `scripts/openclaw-export.sh`,
-> `scripts/gen-portal-key.js`, `portal/docs/adr/*`. Este handoff **consolida e
-> supera** o DEPLOY.md onde houver divergência (o projeto evoluiu).
+> Companheiros (no repo): `docs/DEPLOY.md`, `docs/RUNBOOK.md`,
+> `docs/DEPLOY_SECRETS.md` (CD), `docker-compose.yml`, `.env.example`,
+> `scripts/openclaw-export.sh`, `scripts/gen-portal-key.js`, `docs/adr/*`.
+> Este handoff **consolida e supera** o DEPLOY.md onde divergir.
+
+---
+
+## 0. LEIA PRIMEIRO — layout standalone + 2 repos + CD
+
+- **Repo do portal mudou.** O portal agora é o repo **standalone**
+  `github.com/josuenvpereira/producao-portal` (extraído do `remotion_project`
+  com histórico). **A raiz do repo É o portal.** Onde o DEPLOY.md/handoff
+  antigos dizem `portal/...` ou `npm --prefix portal ...` ou
+  `cp portal/.env.example`, agora é **a raiz**: `./.env.example`,
+  `npm ...`, `docs/...`, `scripts/...` (sem `portal/` nem `../`).
+- **Dois repos no VPS (a dependência de dados NÃO mudou):**
+  1. **`producao-portal`** (este) → clonar em `VPS_PORTAL_DIR` (ex.:
+     `/docker/portal/producao-portal`); é onde sobe o container.
+  2. **`remotion_project`** → continua precisando de um clone separado,
+     montado `:ro` em `/repo` (var `PORTAL_REPO_DIR`), p/ os dados de
+     **vídeo** (`script.json`, áudio/imagens, pipeline-state). `GITHUB_REPO`
+     no `.env` continua `josuenvpereira/remotion_project` (a API do Actions
+     observa o `render-ep.yml` de lá). **NÃO** aponte `/repo` para este repo.
+- **`org.json`** agora vive na **raiz deste repo** (versionado, roster-driven;
+  o Dockerfile copia p/ `/app/org.json`). Não vem mais do `remotion_project`.
+- **CD já existe:** `.github/workflows/deploy.yml` faz push-deploy via SSH.
+  Configure os segredos (`docs/DEPLOY_SECRETS.md`) como parte do deploy —
+  depois disso, todo `push` na `main` atualiza o `producao.jotaene.ia.br`
+  sozinho (`git reset --hard origin/main` + `docker compose up -d --build` +
+  healthz). O setup INICIAL (este handoff) ainda é manual/faseado.
 
 ---
 

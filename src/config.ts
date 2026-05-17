@@ -55,6 +55,12 @@ export const config = {
     webhookSecret: optional('GITHUB_WEBHOOK_SECRET', ''),
   },
 
+  // org.json é roster-driven (scripts/generate_org_manifest.js) e vive na
+  // RAIZ deste repo (standalone). Em prod o Dockerfile copia p/ /app/org.json.
+  org: {
+    manifestPath: absDir(optional('ORG_MANIFEST_PATH', './org.json')),
+  },
+
   openclaw: {
     usageUrl: optional('OPENCLAW_USAGE_URL', 'https://claw.jotaene.ia.br/usage'),
     usageToken: optional('OPENCLAW_USAGE_TOKEN', ''),

@@ -28,6 +28,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --from=server /srv/dist ./dist
 COPY --from=web /web/dist ./web/dist
+# org.json (roster-driven, versionado) — lido por ORG_MANIFEST_PATH (=/app/org.json)
+COPY org.json ./org.json
 
 # Não-root (UID 1000 = user `node` da imagem oficial, igual ao container
 # OpenClaw). /data é volume (sqlite + vault); /repo é mount read-only.

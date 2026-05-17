@@ -1,0 +1,4 @@
+{
+  "//": "Scripts utilitários são CommonJS (require). O package.json da raiz é ESM (type:module) — este arquivo isola scripts/ como CJS.",
+  "type": "commonjs"
+}

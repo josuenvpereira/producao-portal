@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-17T23:01:44.414Z",
+  "project": "My Storage Units",
+  "ceo": {
+    "id": "main",
+    "branch": "main",
+    "emoji": "⚡",
+    "name": "Jotaene",
+    "role": "CEO · Comandante de Inteligência",
+    "model": "deepseek-v4-pro"
+  },
+  "pipeline": [
+    "curador-msu",
+    "roteirista-msu",
+    "diretor-criativo-msu",
+    "produtor-msu",
+    "revisor-msu",
+    "designer-msu"
+  ],
+  "states": [
+    "NEW",
+    "CURADORIA",
+    "BRIEF_OK",
+    "ROTEIRO",
+    "SCRIPT_OK",
+    "BRANDING",
+    "BRANDING_OK",
+    "PRODUCAO_AUDIO",
+    "AUDIO_OK",
+    "RENDER_QUEUED",
+    "RENDERED",
+    "REVISAO",
+    "REVIEW_OK",
+    "PACKAGING",
+    "PACKAGED",
+    "READY_TO_PUBLISH",
+    "PUBLISHED",
+    "REPROVADO",
+    "ESCALATED"
+  ],
+  "squads": [
+    {
+      "id": "conteudo",
+      "name": "Conteúdo · Mensageria",
+      "agents": [
+        {
+          "id": "gerente-com",
+          "branch": "gerente-com",
+          "emoji": "📋",
+          "name": "Gerente Comunicação",
+          "role": "Gerente · pautas (mensageria/Jotaene)",
+          "model": "deepseek-v4-pro",
+          "lead": true,
+          "handsOffTo": []
+        },
+        {
+          "id": "analista-com",
+          "branch": "analista-com",
+          "emoji": "✍️",
+          "name": "Analista Comunicação",
+          "role": "Analista · publica posts (WhatsApp)",
+          "model": "deepseek-v4-flash",
+          "handsOffTo": []
+        }
+      ]
+    },
+    {
+      "id": "canal_msu",
+      "name": "Canal MSU · Vídeo",
+      "agents": [
+        {
+          "id": "gerente-canal-msu",
+          "branch": "gerente-canal-msu",
+          "emoji": "📺",
+          "name": "Gerente Canal MSU",
+          "role": "Gerente do Canal MSU",
+          "model": "deepseek-v4-flash",
+          "lead": true,
+          "handsOffTo": []
+        },
+        {
+          "id": "curador-msu",
+          "branch": "curador-msu",
+          "emoji": "🔍",
+          "name": "Curador de Vídeo",
+          "role": "Curador · pesquisa de mercado",
+          "model": "deepseek-v4-pro",
+          "handsOffTo": [
+            "roteirista-msu"
+          ]
+        },
+        {
+          "id": "roteirista-msu",
+          "branch": "roteirista-msu",
+          "emoji": "✍️",
+          "name": "Roteirista de Vídeo",
+          "role": "Roteirista · narrativa + script.json",
+          "model": "deepseek-v4-pro",
+          "handsOffTo": [
+            "diretor-criativo-msu"
+          ]
+        },
+        {
+          "id": "diretor-criativo-msu",
+          "branch": "diretor-criativo-msu",
+          "emoji": "🎨",
+          "name": "Diretor Criativo de Vídeo",
+          "role": "Diretor Criativo · branding",
+          "model": "deepseek-v4-pro",
+          "handsOffTo": [
+            "produtor-msu"
+          ]
+        },
+        {
+          "id": "produtor-msu",
+          "branch": "produtor-msu",
+          "emoji": "🎬",
+          "name": "Produtor de Vídeo",
+          "role": "Produtor · TTS + render",
+          "model": "deepseek-v4-flash",
+          "handsOffTo": [
+            "revisor-msu"
+          ]
+        },
+        {
+          "id": "revisor-msu",
+          "branch": "revisor-msu",
+          "emoji": "🔬",
+          "name": "Revisor de Vídeo",
+          "role": "Revisor · QA do MP4",
+          "model": "deepseek-v4-pro",
+          "handsOffTo": [
+            "designer-msu"
+          ]
+        },
+        {
+          "id": "designer-msu",
+          "branch": "designer-msu",
+          "emoji": "🎣",
+          "name": "Designer de Hook",
+          "role": "Designer de Hook · thumbnails",
+          "model": "deepseek-v4-flash",
+          "handsOffTo": []
+        }
+      ]
+    }
+  ]
+}
