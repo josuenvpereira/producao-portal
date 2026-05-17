@@ -106,10 +106,12 @@ export function costSummary(db: Db) {
        ORDER BY ce.tts_cost_usd DESC`,
     )
     .all();
+  // Tokens/custo reais do OpenClaw (agent_usage, via exporter).
   const byAgent = db
     .prepare(
-      `SELECT agent, source, SUM(tokens) tokens, SUM(cost_usd) cost_usd, period
-       FROM token_usage GROUP BY agent, period ORDER BY cost_usd DESC`,
+      `SELECT agent_id agent, model, SUM(sessions) sessions,
+              SUM(total_tokens) tokens, SUM(cost_usd) cost_usd
+       FROM agent_usage GROUP BY agent_id, model ORDER BY tokens DESC`,
     )
     .all();
   const totalEst = (
@@ -118,7 +120,10 @@ export function costSummary(db: Db) {
     }
   ).s;
   const totalUsage = (
-    db.prepare('SELECT COALESCE(SUM(cost_usd),0) s FROM token_usage').get() as { s: number }
+    db.prepare('SELECT COALESCE(SUM(cost_usd),0) s FROM agent_usage').get() as { s: number }
+  ).s;
+  const totalTokens = (
+    db.prepare('SELECT COALESCE(SUM(total_tokens),0) s FROM agent_usage').get() as { s: number }
   ).s;
   return {
     estimates,
@@ -126,9 +131,33 @@ export function costSummary(db: Db) {
     totals: {
       ttsEstimateUsd: Math.round(totalEst * 100) / 100,
       openclawUsd: Math.round(totalUsage * 100) / 100,
+      openclawTokens: totalTokens,
       monthlyBudgetUsd: config.cost.monthlyBudgetUsd,
       overBudget: totalEst + totalUsage > config.cost.monthlyBudgetUsd,
     },
+    degraded: degradedNotes(db),
+  };
+}
+
+export function comunicacao(db: Db) {
+  const jobs = db
+    .prepare(
+      `SELECT id, agent_id, name, description, enabled, schedule_expr, tz, status,
+              last_run_at, last_status, last_duration, next_run_at, consec_errors
+       FROM cron_jobs ORDER BY enabled DESC, name`,
+    )
+    .all();
+  const runs = db
+    .prepare(
+      `SELECT job_id, agent_id, at_ms, status, summary, duration_ms, model,
+              total_tokens
+       FROM cron_runs ORDER BY at_ms DESC LIMIT 60`,
+    )
+    .all();
+  return {
+    jobs,
+    runs,
+    exportedAt: getMeta(db, 'openclaw_exported_at'),
     degraded: degradedNotes(db),
   };
 }

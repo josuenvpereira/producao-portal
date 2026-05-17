@@ -148,4 +148,52 @@ export const MIGRATIONS: ReadonlyArray<{ v: number; sql: string }> = [
     CREATE INDEX IF NOT EXISTS idx_hist_episode ON state_history(episode_id);
   `,
   },
+  {
+    v: 2,
+    sql: `
+    -- Crons do OpenClaw (esteira de Comunicação) — snapshot via exporter host.
+    CREATE TABLE IF NOT EXISTS cron_jobs (
+      id            TEXT PRIMARY KEY,
+      agent_id      TEXT,
+      name          TEXT,
+      description   TEXT,
+      enabled       INTEGER,
+      schedule_expr TEXT,
+      tz            TEXT,
+      status        TEXT,
+      last_run_at   INTEGER,
+      last_status   TEXT,
+      last_duration INTEGER,
+      next_run_at   INTEGER,
+      consec_errors INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS cron_runs (
+      job_id      TEXT,
+      session_id  TEXT,
+      agent_id    TEXT,
+      at_ms       INTEGER,
+      action      TEXT,
+      status      TEXT,
+      summary     TEXT,
+      duration_ms INTEGER,
+      model       TEXT,
+      in_tokens   INTEGER,
+      out_tokens  INTEGER,
+      total_tokens INTEGER,
+      PRIMARY KEY (job_id, session_id)
+    );
+    CREATE TABLE IF NOT EXISTS agent_usage (
+      agent_id    TEXT,
+      model       TEXT,
+      sessions    INTEGER,
+      in_tokens   INTEGER,
+      out_tokens  INTEGER,
+      total_tokens INTEGER,
+      cost_usd    REAL,
+      PRIMARY KEY (agent_id, model)
+    );
+    CREATE INDEX IF NOT EXISTS idx_cronruns_job ON cron_runs(job_id);
+    CREATE INDEX IF NOT EXISTS idx_cronruns_at ON cron_runs(at_ms);
+  `,
+  },
 ];

@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { openDb, getMeta, setMeta } from './db.js';
+import { MIGRATIONS } from './migrations.js';
+
+const LATEST = String(Math.max(...MIGRATIONS.map((m) => m.v)));
 
 // node:sqlite suporta ':memory:' — testa migrations + upsert idempotente.
 describe('db', () => {
   it('aplica migrations e versiona o schema', () => {
     const db = openDb(':memory:');
-    expect(getMeta(db, 'schema_version')).toBe('1');
+    expect(getMeta(db, 'schema_version')).toBe(LATEST);
     const t = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='episodes'")
       .get();

@@ -58,6 +58,11 @@ export const config = {
   openclaw: {
     usageUrl: optional('OPENCLAW_USAGE_URL', 'https://claw.jotaene.ia.br/usage'),
     usageToken: optional('OPENCLAW_USAGE_TOKEN', ''),
+    // snapshots gerados por scripts/openclaw-export.sh (host) — montado :ro
+    exportDir: absDir(optional('OPENCLAW_EXPORT_DIR', './data/openclaw-export')),
+    // preço DeepSeek (USD por 1M tokens) p/ estimar custo — Josué configura
+    priceProPer1M: Number(optional('DEEPSEEK_PRO_USD_PER_1M', '0')),
+    priceFlashPer1M: Number(optional('DEEPSEEK_FLASH_USD_PER_1M', '0')),
   },
 
   storage: {

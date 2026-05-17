@@ -30,6 +30,7 @@ export const api = {
   pipeline: () => req<PipelineList>('/pipeline'),
   episode: (id: string) => req<EpisodeDetail>(`/episodes/${id}`),
   cost: () => req<CostSummary>('/cost/summary'),
+  comunicacao: () => req<Comunicacao>('/comunicacao'),
   assets: () => req<AssetsList>('/assets'),
   org: () => req<OrgManifest>('/org'),
   assetUrl: (relPath: string) => `/api/assets/file?path=${encodeURIComponent(relPath)}`,
@@ -102,8 +103,43 @@ export interface CostSummary {
     projected_usd: number | null;
     budget_usd: number | null;
   }>;
-  byAgent: Array<{ agent: string; source: string; tokens: number; cost_usd: number; period: string }>;
-  totals: { ttsEstimateUsd: number; openclawUsd: number; monthlyBudgetUsd: number; overBudget: boolean };
+  byAgent: Array<{ agent: string; model: string; sessions: number; tokens: number; cost_usd: number }>;
+  totals: {
+    ttsEstimateUsd: number;
+    openclawUsd: number;
+    openclawTokens: number;
+    monthlyBudgetUsd: number;
+    overBudget: boolean;
+  };
+  degraded: string[];
+}
+export interface Comunicacao {
+  jobs: Array<{
+    id: string;
+    agent_id: string;
+    name: string;
+    description: string;
+    enabled: number;
+    schedule_expr: string;
+    tz: string;
+    status: string;
+    last_run_at: number | null;
+    last_status: string | null;
+    last_duration: number | null;
+    next_run_at: number | null;
+    consec_errors: number;
+  }>;
+  runs: Array<{
+    job_id: string;
+    agent_id: string;
+    at_ms: number;
+    status: string;
+    summary: string;
+    duration_ms: number;
+    model: string;
+    total_tokens: number;
+  }>;
+  exportedAt: string | null;
   degraded: string[];
 }
 export interface AssetsList {

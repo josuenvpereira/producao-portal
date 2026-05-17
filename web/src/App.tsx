@@ -16,6 +16,7 @@ import { Overview } from './pages/Overview';
 import { Esteira } from './pages/Esteira';
 import { Episode } from './pages/Episode';
 import { Custos } from './pages/Custos';
+import { Comunicacao } from './pages/Comunicacao';
 import { Organograma } from './pages/Organograma';
 import { Assets } from './pages/Assets';
 
@@ -24,6 +25,7 @@ const CRUMB: Record<string, string> = {
   '/esteira': 'Esteira',
   '/episodios': 'Episódios',
   '/custos': 'Custos',
+  '/comunicacao': 'Comunicação',
   '/organograma': 'Organograma',
   '/assets': 'Assets',
 };
@@ -76,6 +78,7 @@ function Shell() {
 
           <div className="nav-group">Custos & Org</div>
           <NavLink to="/custos" className={link}><span className="ic">$</span> Custos</NavLink>
+          <NavLink to="/comunicacao" className={link}><span className="ic">✉</span> Comunicação</NavLink>
           <NavLink to="/organograma" className={link}><span className="ic">⌥</span> Organograma</NavLink>
 
           <div className="nav-group">Acervo</div>
@@ -107,6 +110,7 @@ function Shell() {
               <Route path="/episodios" element={<Esteira />} />
               <Route path="/episodios/:id" element={<EpisodeRoute />} />
               <Route path="/custos" element={<Custos />} />
+              <Route path="/comunicacao" element={<Comunicacao />} />
               <Route path="/organograma" element={<Organograma />} />
               <Route path="/assets" element={<Assets />} />
             </Routes>

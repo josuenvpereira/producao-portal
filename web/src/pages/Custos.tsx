@@ -56,24 +56,34 @@ export function Custos() {
           </table>
         </Panel>
 
-        <Panel flush title="Consumo por agente (OpenClaw)" sub="tokens de LLM por agente">
+        <Panel
+          flush
+          title="Consumo por agente (OpenClaw)"
+          sub={`tokens reais por agente/modelo · ${data.totals.openclawTokens.toLocaleString('pt-BR')} tokens`}
+        >
           <table className="tbl">
-            <thead><tr><th>Agente</th><th>Período</th><th>Tokens</th><th>Custo</th></tr></thead>
+            <thead><tr><th>Agente</th><th>Modelo</th><th>Sessões</th><th>Tokens</th><th>Custo*</th></tr></thead>
             <tbody>
               {data.byAgent.length === 0 && (
-                <tr><td colSpan={4} className="muted">
-                  Indisponível — /usage do OpenClaw é HTML (não-JSON). Mapeamento pendente
-                  (item de investigação). Degrada sem quebrar.
+                <tr><td colSpan={5} className="muted">
+                  Sem dados — rode o exporter no VPS (scripts/openclaw-export.sh).
                 </td></tr>
               )}
               {data.byAgent.map((a, i) => (
                 <tr key={i}>
-                  <td>{a.agent}</td><td className="muted">{a.period}</td>
-                  <td className="mono">{a.tokens}</td><td className="mono">{fmtUsd(a.cost_usd)}</td>
+                  <td>{a.agent}</td>
+                  <td className="muted">{a.model.replace('deepseek-', '')}</td>
+                  <td className="mono muted">{a.sessions}</td>
+                  <td className="mono">{a.tokens.toLocaleString('pt-BR')}</td>
+                  <td className="mono">{a.cost_usd ? fmtUsd(a.cost_usd) : '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <div className="muted" style={{ padding: '10px 16px', fontSize: 11 }}>
+            *Custo = tokens × preço DeepSeek configurável (DEEPSEEK_PRO/FLASH_USD_PER_1M no .env).
+            Tokens são reais; defina o preço pra ver USD.
+          </div>
         </Panel>
       </div>
     </>

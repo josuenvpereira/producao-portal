@@ -7,6 +7,7 @@ import { openDb, setMeta, type Db } from './db/db.js';
 import { readRepoSnapshot } from './adapters/repoFs.js';
 import { fetchRenderData } from './adapters/githubActions.js';
 import { fetchOpenClawUsage } from './adapters/openclawUsage.js';
+import { readOpenClawSnapshot } from './adapters/openclawExport.js';
 import { deriveCosts } from './adapters/costDerive.js';
 import type { EpisodeProjection } from './adapters/types.js';
 
@@ -121,6 +122,9 @@ export interface IndexResult {
   runs: number;
   artifacts: number;
   usageRows: number;
+  crons: number;
+  cronRuns: number;
+  agentUsage: number;
   degraded: string[];
 }
 
@@ -221,7 +225,45 @@ export async function runIndexer(): Promise<IndexResult> {
     throw err;
   }
 
+  // OpenClaw snapshot (crons + esteira Comunicação + custo por agente)
+  const oc = readOpenClawSnapshot(config.openclaw.exportDir, {
+    pro: config.openclaw.priceProPer1M,
+    flash: config.openclaw.priceFlashPer1M,
+  });
+  if (oc.degraded) degraded.push(...oc.notes);
+  db.exec('BEGIN');
+  try {
+    db.exec('DELETE FROM cron_jobs; DELETE FROM cron_runs; DELETE FROM agent_usage;');
+    const insJ = db.prepare(
+      `INSERT INTO cron_jobs (id, agent_id, name, description, enabled, schedule_expr, tz, status, last_run_at, last_status, last_duration, next_run_at, consec_errors)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    );
+    for (const c of oc.data.crons) {
+      insJ.run(c.id, c.agentId, c.name, c.description, c.enabled ? 1 : 0, c.scheduleExpr, c.tz, c.status, c.lastRunAtMs, c.lastRunStatus, c.lastDurationMs, c.nextRunAtMs, c.consecutiveErrors);
+    }
+    const insR = db.prepare(
+      `INSERT INTO cron_runs (job_id, session_id, agent_id, at_ms, action, status, summary, duration_ms, model, in_tokens, out_tokens, total_tokens)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(job_id, session_id) DO UPDATE SET status=excluded.status, summary=excluded.summary`,
+    );
+    for (const r of oc.data.cronRuns) {
+      insR.run(r.jobId, r.sessionId || `${r.jobId}:${r.atMs}`, r.agentId, r.atMs, r.action, r.status, r.summary, r.durationMs, r.model, r.inputTokens, r.outputTokens, r.totalTokens);
+    }
+    const insAU = db.prepare(
+      `INSERT INTO agent_usage (agent_id, model, sessions, in_tokens, out_tokens, total_tokens, cost_usd)
+       VALUES (?,?,?,?,?,?,?)`,
+    );
+    for (const u of oc.data.usage) {
+      insAU.run(u.agentId, u.model, u.sessions, u.inputTokens, u.outputTokens, u.totalTokens, u.costUsd);
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+
   setMeta(db, 'last_sync', new Date().toISOString());
+  setMeta(db, 'openclaw_exported_at', oc.data.exportedAt ?? '');
   setMeta(db, 'degraded', JSON.stringify(degraded));
 
   const result: IndexResult = {
@@ -229,6 +271,9 @@ export async function runIndexer(): Promise<IndexResult> {
     runs: gh.data.runs.length,
     artifacts: gh.data.artifacts.length,
     usageRows: usage.data.length,
+    crons: oc.data.crons.length,
+    cronRuns: oc.data.cronRuns.length,
+    agentUsage: oc.data.usage.length,
     degraded,
   };
   log.info(result, 'indexação concluída');
