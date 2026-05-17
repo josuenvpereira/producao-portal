@@ -106,17 +106,16 @@ function buildSquads(org: OrgManifest, ov: Overview | null, navigate: (p: string
   const edges: Edge[] = [];
   const squads = org.squads ?? [];
   const allAgents = squads.flatMap((s) => s.agents);
-  // Os dois "managers" (times separados): gerente_conteudo (mensageria) e
-  // orquestrador_msu (canal). Achados em qualquer squad — não hardcoda id.
-  const gerente = allAgents.find((a) => a.id.includes('gerente'));
-  const orq = allAgents.find((a) => a.id.includes('orquestrador'));
+  const GX = 180, OX = 940; // x da banda/liderança conteúdo / canal
+  const MID = (GX + OX) / 2 + 120;
 
-  const MID = 560;
-  const GX = 180, OX = 940; // x da liderança/banda gov / ops
+  // CEO = Jotaene (org.ceo, branch main)
+  const ceo = org.ceo;
   nodes.push({
     id: 'ceo', type: 'card', position: { x: MID, y: 0 },
     data: {
-      variant: 'ceo', emoji: '🧠', name: 'Josué', role: 'CEO · Comandante',
+      variant: 'ceo', emoji: ceo?.emoji ?? '🧠', name: ceo?.name ?? 'CEO',
+      role: short(ceo?.role ?? 'CEO'),
       stats: [
         { v: allAgents.length, l: 'Agentes' },
         { v: squads.length, l: 'Squads' },
@@ -127,55 +126,54 @@ function buildSquads(org: OrgManifest, ov: Overview | null, navigate: (p: string
     },
   });
 
-  const leads = [
-    { a: gerente, variant: 'gov' as const, x: GX, band: 'gestao' },
-    { a: orq, variant: 'ops' as const, x: OX, band: 'video_msu' },
-  ];
-  for (const L of leads) {
-    if (!L.a) continue;
-    nodes.push({
-      id: L.a.id, type: 'card', position: { x: L.x, y: 210 },
-      data: {
-        variant: L.variant, emoji: L.a.emoji, name: L.a.name, role: short(L.a.role),
-        stats: [
-          { v: allAgents.length, l: 'Agentes' },
-          { v: num(ov?.kpis.inPipeline), l: 'Esteira' },
-          { v: num(ov?.kpis.published), l: 'Publicados' },
-          { v: num(ov?.kpis.escalated), l: 'Escalados' },
-        ],
-        actionLabel: 'Ver esteira', onOpen: () => navigate('/esteira'),
-      },
-    });
-    edges.push({
-      id: `ceo-${L.a.id}`, source: 'ceo', target: L.a.id, type: 'bezier',
-      style: { stroke: `var(--c-${L.variant})`, strokeWidth: 2 }, animated: true,
-    });
-  }
-
-  // bandas (1 por squad) + cards de agente sob a banda
   squads.forEach((sq) => {
     const isCont = sq.id === 'conteudo';
-    const color = isCont ? 'gov' : 'ops';
-    const bandX = isCont ? GX : OX;
+    const color: NodeData['variant'] = isCont ? 'gov' : 'ops';
+    const x = isCont ? GX : OX;
+    const lead = sq.agents.find((a) => a.lead);
+    const supervisor = sq.agents.find((a) => a.supervisor);
+    const members = sq.agents.filter((a) => !a.lead && !a.supervisor);
+
+    // líder do time (card com stats)
+    if (lead) {
+      nodes.push({
+        id: lead.id, type: 'card', position: { x, y: 210 },
+        data: {
+          variant: color, emoji: lead.emoji, name: lead.name, role: short(lead.role),
+          stats: [
+            { v: members.length + 1, l: 'Agentes' },
+            { v: isCont ? '—' : num(ov?.kpis.inPipeline), l: 'Esteira' },
+            { v: isCont ? '—' : num(ov?.kpis.published), l: 'Publicados' },
+            { v: isCont ? '—' : num(ov?.kpis.escalated), l: 'Escalados' },
+          ],
+          actionLabel: 'Ver esteira', onOpen: () => navigate('/esteira'),
+        },
+      });
+      edges.push({
+        id: `ceo-${lead.id}`, source: 'ceo', target: lead.id, type: 'bezier',
+        style: { stroke: `var(--c-${color})`, strokeWidth: 2 }, animated: true,
+      });
+    }
+
+    // banda do squad
     const bandId = `band-${sq.id}`;
     nodes.push({
-      id: bandId, type: 'band', position: { x: bandX + 40, y: 410 },
+      id: bandId, type: 'band', position: { x: x + 40, y: 410 },
       data: { variant: color, emoji: '', name: sq.name.toUpperCase(), role: `${sq.agents.length} agente(s)` },
     });
-    const parent = isCont ? gerente?.id : orq?.id;
-    if (parent) edges.push({
-      id: `${parent}-${bandId}`, source: parent, target: bandId, type: 'bezier',
-      style: { stroke: `var(--c-${color})`, strokeWidth: 2 },
+    edges.push({
+      id: `${lead ? lead.id : 'ceo'}-${bandId}`, source: lead ? lead.id : 'ceo',
+      target: bandId, type: 'bezier', style: { stroke: `var(--c-${color})`, strokeWidth: 2 },
     });
-    // agentes que não são liderança — grade 2 colunas (não empilha alto)
-    const members = sq.agents.filter((a) => a.id !== gerente?.id && a.id !== orq?.id);
+
+    // membros — grade 2 colunas
     members.forEach((a, ai) => {
       nodes.push({
         id: a.id, type: 'agent',
-        position: { x: bandX - 110 + (ai % 2) * 280, y: 540 + Math.floor(ai / 2) * 170 },
+        position: { x: x - 110 + (ai % 2) * 280, y: 540 + Math.floor(ai / 2) * 170 },
         data: {
           variant: 'plain', emoji: a.emoji, name: a.name, role: short(a.role),
-          chips: (a.handsOffTo ?? []).slice(0, 3).map((h) => h.replace(/_/g, '-')),
+          chips: (a.handsOffTo ?? []).slice(0, 3),
           onOpen: () => navigate('/esteira'),
         },
       });
@@ -184,19 +182,31 @@ function buildSquads(org: OrgManifest, ov: Overview | null, navigate: (p: string
         style: { stroke: `var(--c-${color})`, strokeWidth: 1.5 },
       });
     });
-  });
 
-  // supervisão do orquestrador (tracejada) → agentes do pipeline
-  if (orq) {
-    for (const aid of org.pipeline ?? []) {
-      if (nodes.some((n) => n.id === aid)) {
-        edges.push({
-          id: `sup-${aid}`, source: orq.id, target: aid, type: 'bezier',
-          style: { stroke: 'var(--c-ops)', strokeDasharray: '4 4', opacity: 0.5 },
-        });
+    // supervisor (orquestrador) — card distinto + arestas tracejadas → pipeline
+    if (supervisor) {
+      nodes.push({
+        id: supervisor.id, type: 'card', position: { x: x + 360, y: 410 },
+        data: {
+          variant: 'ops', emoji: supervisor.emoji, name: supervisor.name,
+          role: short(supervisor.role),
+          actionLabel: 'Ver esteira', onOpen: () => navigate('/esteira'),
+        },
+      });
+      edges.push({
+        id: `ceo-${supervisor.id}`, source: 'ceo', target: supervisor.id,
+        type: 'bezier', style: { stroke: 'var(--c-ops)', strokeDasharray: '4 4', opacity: 0.5 },
+      });
+      for (const pid of org.pipeline ?? []) {
+        if (members.some((m) => m.id === pid)) {
+          edges.push({
+            id: `sup-${pid}`, source: supervisor.id, target: pid, type: 'bezier',
+            style: { stroke: 'var(--c-ops)', strokeDasharray: '4 4', opacity: 0.45 },
+          });
+        }
       }
     }
-  }
+  });
   return { nodes, edges };
 }
 
@@ -205,6 +215,15 @@ function buildAgentes(org: OrgManifest, navigate: (p: string) => void) {
   const edges: Edge[] = [];
   const order = org.pipeline ?? [];
   const all = (org.squads ?? []).flatMap((s) => s.agents);
+  if (org.ceo) {
+    nodes.push({
+      id: 'ceo', type: 'card', position: { x: -120, y: -150 },
+      data: {
+        variant: 'ceo', emoji: org.ceo.emoji, name: org.ceo.name,
+        role: short(org.ceo.role), actionLabel: 'Dashboard', onOpen: () => navigate('/'),
+      },
+    });
+  }
   const idx = (id: string) => { const i = order.indexOf(id); return i === -1 ? 90 : i; };
   const sorted = [...all].sort((a, b) => idx(a.id) - idx(b.id));
   sorted.forEach((a, i) => {
@@ -327,9 +346,9 @@ export function Organograma() {
 
           <div className="plabel">Legenda</div>
           <div className="oleg">
-            <div><i style={{ background: 'var(--c-ceo)' }} /> CEO (Josué)</div>
-            <div><i style={{ background: 'var(--c-gov)' }} /> Gerente Conteúdo (mensageria)</div>
-            <div><i style={{ background: 'var(--c-ops)' }} /> Orquestrador MSU (canal vídeo)</div>
+            <div><i style={{ background: 'var(--c-ceo)' }} /> CEO (Jotaene · main)</div>
+            <div><i style={{ background: 'var(--c-gov)' }} /> Conteúdo · Mensageria</div>
+            <div><i style={{ background: 'var(--c-ops)' }} /> Canal MSU · Vídeo + Orquestrador</div>
             <div><i style={{ background: 'var(--c-dev)' }} /> Agentes da pipeline</div>
           </div>
         </div>
