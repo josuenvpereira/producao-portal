@@ -14,6 +14,7 @@ import { RefreshCtx } from './refresh';
 import { Login } from './Login';
 import { Overview } from './pages/Overview';
 import { Esteira } from './pages/Esteira';
+import { Episodios } from './pages/Episodios';
 import { Episode } from './pages/Episode';
 import { Custos } from './pages/Custos';
 import { Comunicacao } from './pages/Comunicacao';
@@ -133,7 +134,7 @@ function Shell() {
             <Routes>
               <Route path="/" element={<Overview />} />
               <Route path="/esteira" element={<Esteira />} />
-              <Route path="/episodios" element={<Esteira />} />
+              <Route path="/episodios" element={<Episodios />} />
               <Route path="/episodios/:id" element={<EpisodeRoute />} />
               <Route path="/custos" element={<Custos />} />
               <Route path="/comunicacao" element={<Comunicacao />} />
