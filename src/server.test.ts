@@ -79,7 +79,7 @@ describe('auth + API gate', () => {
       payload: { key: TEST_KEY },
     });
     const cookie = cookieHeader(login);
-    for (const url of ['/api/pipeline', '/api/cost/summary', '/api/assets', '/api/org']) {
+    for (const url of ['/api/pipeline', '/api/cost/summary', '/api/assets', '/api/esteira', '/api/org']) {
       const res = await app.inject({ method: 'GET', url, headers: { cookie } });
       expect(res.statusCode, url).toBe(200);
     }

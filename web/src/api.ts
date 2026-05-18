@@ -50,6 +50,7 @@ export const api = {
   comunicacao: () => req<Comunicacao>('/comunicacao'),
   assets: () => req<AssetsList>('/assets'),
   org: () => req<OrgManifest>('/org'),
+  esteira: () => req<EsteiraData>('/esteira'),
   assetUrl: (relPath: string) => `/api/assets/file?path=${encodeURIComponent(relPath)}`,
 
   // ── SFX Factory ──
@@ -203,6 +204,26 @@ export interface Comunicacao {
 }
 export interface AssetsList {
   assets: Array<{ episode_id: string; kind: string; rel_path: string; bytes: number; mtime: string }>;
+  degraded: string[];
+}
+export interface EsteiraAgent {
+  id: string;
+  name: string;
+  emoji: string;
+  role: string;
+}
+export interface EsteiraEpisode {
+  episode_id: string;
+  title: string;
+  state: string | null;
+  escalated: number;
+  last_agent: string | null;
+  last_at: string | null;
+}
+export interface EsteiraData {
+  pipeline: string[];
+  agents: EsteiraAgent[];
+  episodes: EsteiraEpisode[];
   degraded: string[];
 }
 export interface SfxStatus {

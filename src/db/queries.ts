@@ -172,6 +172,45 @@ export function assetsList(db: Db) {
   return { assets: rows, degraded: degradedNotes(db) };
 }
 
+// Esteira visual: o fluxo de fases vem do org.json (`pipeline` = agentes na
+// ordem do handoff); cada episódio é posicionado pelo ÚLTIMO `by_agent` do
+// state_history (dado real, sem inferir estado→fase).
+export function esteira(db: Db) {
+  const org = orgManifest() as {
+    pipeline?: string[];
+    squads?: Array<{
+      agents?: Array<{ id: string; name?: string; emoji?: string; role?: string }>;
+    }>;
+  };
+  const pipeline = Array.isArray(org.pipeline) ? org.pipeline : [];
+  const byId = new Map<string, { id: string; name: string; emoji: string; role: string }>();
+  for (const sq of org.squads ?? []) {
+    for (const a of sq.agents ?? []) {
+      byId.set(a.id, {
+        id: a.id,
+        name: a.name ?? a.id,
+        emoji: a.emoji ?? '•',
+        role: a.role ?? '',
+      });
+    }
+  }
+  const agents = pipeline.map(
+    (id) => byId.get(id) ?? { id, name: id, emoji: '•', role: '' },
+  );
+  const episodes = db
+    .prepare(
+      `SELECT e.episode_id, e.title, e.state, e.escalated,
+              (SELECT by_agent FROM state_history sh WHERE sh.episode_id=e.episode_id
+                 ORDER BY sh.seq DESC LIMIT 1) AS last_agent,
+              (SELECT at FROM state_history sh WHERE sh.episode_id=e.episode_id
+                 ORDER BY sh.seq DESC LIMIT 1) AS last_at
+       FROM episodes e
+       ORDER BY e.updated_at DESC NULLS LAST, e.episode_id`,
+    )
+    .all();
+  return { pipeline, agents, episodes, degraded: degradedNotes(db) };
+}
+
 export function orgManifest(): unknown {
   // org.json roster-driven, versionado na raiz deste repo (standalone).
   try {
