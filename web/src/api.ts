@@ -16,9 +16,26 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     msg: string,
+    // 422 de `instruct` inválido: objeto estruturado (§4.5) p/ a UI marcar
+    // tokens inválidos e remontar os dropdowns a partir de `validos`.
+    public detail?: unknown,
   ) {
     super(msg);
   }
+}
+
+// Corpo estruturado do 422 de `instruct` inválido (PORTAL_HANDOFF §4.5).
+export interface InstructError {
+  erro: string;
+  tokens_invalidos: string[];
+  validos: { gender: string[]; age: string[]; accent: string[]; pitch: string[]; style: string[] };
+  exemplo: string;
+}
+export function asInstructError(d: unknown): InstructError | null {
+  if (d && typeof d === 'object' && 'validos' in d && 'tokens_invalidos' in d) {
+    return d as InstructError;
+  }
+  return null;
 }
 
 export const api = {
@@ -52,12 +69,15 @@ export const api = {
     });
     if (!res.ok) {
       let msg = `HTTP ${res.status}`;
+      let detail: unknown;
       try {
-        msg = ((await res.json()) as { error?: string }).error ?? msg;
+        const j = (await res.json()) as { error?: string; detail?: unknown };
+        msg = j.error ?? msg;
+        detail = j.detail;
       } catch {
         /* sem json */
       }
-      throw new ApiError(res.status, msg);
+      throw new ApiError(res.status, msg, detail);
     }
     const blob = await res.blob();
     return {

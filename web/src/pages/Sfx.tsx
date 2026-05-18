@@ -5,20 +5,81 @@ import { useApi } from '../hooks';
 import { Loading, fmtDate } from '../components';
 
 type Kind = 'sfx' | 'bed' | 'vocal';
+type VMode = 'tts' | 'design' | 'clone' | 'multi';
+type InstructSel = { gender: string; age: string; accent: string; pitch: string; style: string };
 
-// Presets de voz p/ OmniVoice — a fábrica NÃO expõe catálogo de vozes (só
-// bed_presets), então a lista é curada aqui. "Personalizado…" libera o
-// instruct livre. Editar/acrescentar à vontade (label + value).
-const VOICE_PRESETS: { label: string; value: string }[] = [
-  { label: 'Padrão da fábrica (recomendado)', value: '' },
-  { label: 'Masc · PT-BR · narrador claro', value: 'male, brazilian portuguese, clear neutral narrator' },
-  { label: 'Masc · PT-BR · enérgico / hype', value: 'male, brazilian portuguese, energetic hype narrator' },
-  { label: 'Masc · PT-BR · sério / analítico', value: 'male, brazilian portuguese, calm serious analytical narrator' },
-  { label: 'Masc · PT-BR · grave / dramático', value: 'male, brazilian portuguese, deep dramatic cinematic narrator' },
-  { label: 'Fem · PT-BR · clara / neutra', value: 'female, brazilian portuguese, clear neutral narrator' },
-  { label: 'Fem · PT-BR · enérgica', value: 'female, brazilian portuguese, energetic narrator' },
-];
-const SPEEDS = ['0.8', '0.9', '1.0', '1.1', '1.2', '1.25'];
+const EMPTY_SEL: InstructSel = { gender: '', age: '', accent: '', pitch: '', style: '' };
+const SEL_KEYS = ['gender', 'age', 'accent', 'pitch', 'style'] as const;
+
+// Vocabulário FIXO de `instruct` — transcrito do PORTAL_HANDOFF §4.5 (o
+// contrato declara esta lista final e autoritativa). NÃO é fabricação: a
+// fábrica valida contra exatamente isto e devolve 422 estruturado com
+// `validos` se algo sair daqui. Voice Design monta o instruct só por estes
+// dropdowns, então o texto enviado é sempre válido por construção.
+const INSTRUCT_VOCAB: Record<keyof InstructSel, string[]> = {
+  gender: ['male', 'female'],
+  age: ['child', 'teenager', 'young adult', 'middle-aged', 'elderly'],
+  accent: [
+    'american accent', 'british accent', 'australian accent', 'canadian accent',
+    'chinese accent', 'indian accent', 'japanese accent', 'korean accent',
+    'portuguese accent', 'russian accent',
+  ],
+  pitch: ['very low pitch', 'low pitch', 'moderate pitch', 'high pitch', 'very high pitch'],
+  style: ['whisper'],
+};
+const SEL_LABEL: Record<keyof InstructSel, string> = {
+  gender: 'gênero', age: 'idade', accent: 'sotaque', pitch: 'tom', style: 'estilo',
+};
+
+function buildInstruct(sel: InstructSel): string {
+  return SEL_KEYS.map((k) => sel[k]).filter(Boolean).join(', ');
+}
+
+// Lê um File como base64 puro (sem o prefixo data:...;base64,). Transporte
+// do Voice Clone / Multi-Speaker conforme §4.5 (base64 no JSON).
+function fileToB64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error('falha ao ler o arquivo'));
+    r.onload = () => {
+      const s = String(r.result);
+      const i = s.indexOf(',');
+      resolve(i >= 0 ? s.slice(i + 1) : s);
+    };
+    r.readAsDataURL(file);
+  });
+}
+const MAX_REF_BYTES = 12 * 1024 * 1024; // §4.5: ~12MB de áudio bruto
+
+function InstructPicker({ sel, onChange }: { sel: InstructSel; onChange: (s: InstructSel) => void }) {
+  return (
+    <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+      {SEL_KEYS.map((k) => (
+        <label key={k} className="muted" style={{ fontSize: 12 }}>
+          {SEL_LABEL[k]}
+          <select
+            className="input"
+            style={{ display: 'block', minWidth: 130 }}
+            value={sel[k]}
+            onChange={(e) => onChange({ ...sel, [k]: e.target.value })}
+          >
+            <option value="">— qualquer —</option>
+            {INSTRUCT_VOCAB[k].map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+interface Speaker {
+  tag: string;
+  sel: InstructSel;
+  refB64: string | null;
+  refName: string | null;
+}
 
 function StatusHeader({ s }: { s: SfxStatus | null }) {
   if (!s) return <span className="badge b-idle">checando…</span>;
@@ -39,14 +100,30 @@ export function Sfx() {
   const { data: library, reload: reloadLib } = useApi(() => api.sfxLibrary(), []);
 
   const [kind, setKind] = useState<Kind>('sfx');
+  const [vmode, setVmode] = useState<VMode>('tts');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [result, setResult] = useState<{ url: string; promptEn: string | null } | null>(null);
 
-  // form state (defaults do §4)
+  // form state (defaults do §4 / §4.5)
   const [sfxF, setSfxF] = useState({ prompt: '', lang: 'pt', duration: 5, steps: 150, seed: '' });
   const [bedF, setBedF] = useState({ prompt: '', name: '', audio_duration: 60, seed: '' });
-  const [vocF, setVocF] = useState({ text: '', language: 'pt', instruct: '', speed: '1.0', custom: false });
+  // vocal: campos comuns + por modo
+  const [vtext, setVtext] = useState('');
+  const [vlang, setVlang] = useState('pt');
+  const [vspeed, setVspeed] = useState('1.0');
+  const [vseed, setVseed] = useState('');
+  const [vnumStep, setVnumStep] = useState('');
+  const [vguid, setVguid] = useState('');
+  const [vsel, setVsel] = useState<InstructSel>(EMPTY_SEL);
+  const [vref, setVref] = useState<{ b64: string; name: string } | null>(null);
+  const [vrefText, setVrefText] = useState('');
+  const [vrefTextOn, setVrefTextOn] = useState(false);
+  const [vspeakers, setVspeakers] = useState<Speaker[]>([
+    { tag: 'Speaker_1', sel: EMPTY_SEL, refB64: null, refName: null },
+    { tag: 'Speaker_2', sel: EMPTY_SEL, refB64: null, refName: null },
+  ]);
+  const [vpause, setVpause] = useState(0.3);
 
   // poll de status a cada 20s
   const rs = useRef(reloadStatus);
@@ -59,15 +136,76 @@ export function Sfx() {
   const offline = !status?.reachable || status?.state === 'offline';
   const locked = busy || !!status?.busy;
 
+  async function onRefFile(
+    file: File | undefined,
+    set: (v: { b64: string; name: string } | null) => void,
+  ): Promise<void> {
+    if (!file) return set(null);
+    if (file.size > MAX_REF_BYTES) {
+      setErr(`Áudio de referência grande demais (${(file.size / 1048576).toFixed(1)}MB; máx 12MB). Use 3–15s.`);
+      return;
+    }
+    try {
+      set({ b64: await fileToB64(file), name: file.name });
+      setErr('');
+    } catch {
+      setErr('Falha ao ler o áudio de referência.');
+    }
+  }
+
   function validate(): string | null {
     if (kind === 'sfx') {
       if (!sfxF.prompt.trim()) return 'Descreva o som (prompt).';
       if (sfxF.duration < 0.5 || sfxF.duration > 30) return 'Duração entre 0.5 e 30s.';
       if (sfxF.steps < 20 || sfxF.steps > 400) return 'Steps entre 20 e 400.';
+      return null;
     }
-    if (kind === 'bed' && !bedF.prompt.trim() && !bedF.name) return 'Informe um prompt OU um preset.';
-    if (kind === 'vocal' && !vocF.text.trim()) return 'Escreva o texto da narração.';
+    if (kind === 'bed') {
+      if (!bedF.prompt.trim() && !bedF.name) return 'Informe um prompt OU um preset.';
+      return null;
+    }
+    // vocal
+    if (!vtext.trim()) return vmode === 'multi' ? 'Escreva o diálogo.' : 'Escreva o texto.';
+    const sp = Number(vspeed);
+    if (vspeed && (sp < 0.5 || sp > 2)) return 'Velocidade entre 0.5 e 2.0.';
+    if (vnumStep && (Number(vnumStep) < 4 || Number(vnumStep) > 64)) return 'num_step entre 4 e 64.';
+    if (vguid && (Number(vguid) < 0 || Number(vguid) > 10)) return 'guidance_scale entre 0 e 10.';
+    if (vmode === 'clone' && !vref) return 'Envie um áudio de referência (3–15s) para o clone.';
+    if (vmode === 'multi') {
+      if (!vspeakers.length) return 'Adicione ao menos um speaker.';
+      if (vspeakers.some((s) => !s.tag.trim())) return 'Todo speaker precisa de uma tag (ex.: Speaker_1).';
+      if (!/\[Speaker_\d+\]\s*:/.test(vtext))
+        return 'O diálogo precisa de marcações [Speaker_N]: (ex.: "[Speaker_1]: Olá").';
+    }
     return null;
+  }
+
+  function vocalBody(): Record<string, unknown> {
+    const adv: Record<string, unknown> = {};
+    if (vspeed) adv['speed'] = Number(vspeed);
+    if (vseed) adv['seed'] = Number(vseed);
+    if (vnumStep) adv['num_step'] = Number(vnumStep);
+    if (vguid) adv['guidance_scale'] = Number(vguid);
+    const base = { text: vtext, language: vlang || null, ...adv };
+    if (vmode === 'tts') return base;
+    if (vmode === 'design') return { ...base, instruct: buildInstruct(vsel) || null };
+    if (vmode === 'clone')
+      return {
+        ...base,
+        ref_audio_b64: vref?.b64,
+        ...(vrefTextOn && vrefText.trim() ? { ref_text: vrefText } : {}),
+      };
+    // multi
+    return {
+      text: vtext,
+      language: vlang || null,
+      pause_between_speakers: vpause,
+      speakers: vspeakers.map((s) => ({
+        tag: s.tag,
+        ...(buildInstruct(s.sel) ? { instruct: buildInstruct(s.sel) } : {}),
+        ...(s.refB64 ? { ref_audio_b64: s.refB64, ref_text: '' } : {}),
+      })),
+    };
   }
 
   async function generate() {
@@ -95,25 +233,31 @@ export function Sfx() {
           audio_duration: bedF.audio_duration,
           ...(bedF.seed ? { seed: Number(bedF.seed) } : {}),
         };
-      else
-        body = {
-          text: vocF.text,
-          language: vocF.language || null,
-          instruct: vocF.instruct || null,
-          ...(vocF.speed ? { speed: Number(vocF.speed) } : {}),
-        };
+      else body = vocalBody();
       const r = await api.sfxGenerate(kind, body);
       setResult({ url: r.url, promptEn: r.promptEn });
       reloadLib();
       reloadStatus();
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : 'Falha na geração.');
+      if (e instanceof ApiError) {
+        const ex =
+          e.detail && typeof e.detail === 'object' && 'exemplo' in e.detail
+            ? ` (ex.: ${String((e.detail as { exemplo?: unknown }).exemplo ?? '')})`
+            : '';
+        setErr(e.message + ex);
+      } else setErr('Falha na geração.');
     } finally {
       setBusy(false);
     }
   }
 
   const inp = { className: 'input', style: { width: '100%' } };
+  const VMODES: Array<[VMode, string]> = [
+    ['tts', 'TTS'],
+    ['design', 'Voice Design'],
+    ['clone', 'Voice Clone'],
+    ['multi', 'Multi-Speaker'],
+  ];
 
   return (
     <>
@@ -155,12 +299,15 @@ export function Sfx() {
                     onChange={(e) => setSfxF({ ...sfxF, duration: Number(e.target.value) })} />
                 </label>
               </div>
-              <div className="row">
-                <label className="muted">steps <input className="input" type="number" min={20} max={400}
-                  value={sfxF.steps} onChange={(e) => setSfxF({ ...sfxF, steps: Number(e.target.value) })} style={{ width: 90 }} /></label>
-                <label className="muted">seed <input className="input" placeholder="opcional"
-                  value={sfxF.seed} onChange={(e) => setSfxF({ ...sfxF, seed: e.target.value })} style={{ width: 110 }} /></label>
-              </div>
+              <details>
+                <summary className="muted" style={{ fontSize: 12, cursor: 'pointer' }}>Avançado</summary>
+                <div className="row" style={{ marginTop: 8 }}>
+                  <label className="muted">steps <input className="input" type="number" min={20} max={400}
+                    value={sfxF.steps} onChange={(e) => setSfxF({ ...sfxF, steps: Number(e.target.value) })} style={{ width: 90 }} /></label>
+                  <label className="muted">seed <input className="input" placeholder="opcional"
+                    value={sfxF.seed} onChange={(e) => setSfxF({ ...sfxF, seed: e.target.value })} style={{ width: 110 }} /></label>
+                </div>
+              </details>
             </div>
           )}
 
@@ -188,37 +335,107 @@ export function Sfx() {
 
           {kind === 'vocal' && (
             <div className="grid" style={{ gap: 10 }}>
-              <textarea {...inp} rows={3} placeholder="texto da narração (PT-BR)"
-                value={vocF.text} onChange={(e) => setVocF({ ...vocF, text: e.target.value })} />
-              <div className="row">
-                <label className="muted" style={{ flex: 1 }}>voz
-                  <select className="input" style={{ width: '100%' }}
-                    value={vocF.custom ? '__custom__' : vocF.instruct}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '__custom__') setVocF({ ...vocF, custom: true, instruct: '' });
-                      else setVocF({ ...vocF, custom: false, instruct: v });
-                    }}>
-                    {VOICE_PRESETS.map((p) => (
-                      <option key={p.label} value={p.value}>{p.label}</option>
-                    ))}
-                    <option value="__custom__">Personalizado…</option>
-                  </select>
-                </label>
-                <label className="muted" style={{ width: 120 }}>velocidade
-                  <select className="input" style={{ width: '100%' }} value={vocF.speed}
-                    onChange={(e) => setVocF({ ...vocF, speed: e.target.value })}>
-                    {SPEEDS.map((s) => (
-                      <option key={s} value={s}>{s === '1.0' ? '1.0× (padrão)' : s + '×'}</option>
-                    ))}
-                  </select>
-                </label>
+              <div className="seg">
+                {VMODES.map(([m, label]) => (
+                  <button key={m} className={vmode === m ? 'on' : ''}
+                    onClick={() => { setVmode(m); setErr(''); }}>{label}</button>
+                ))}
               </div>
-              {vocF.custom && (
-                <input className="input" autoFocus
-                  placeholder='instruct livre (ex.: "male, portuguese accent")'
-                  value={vocF.instruct}
-                  onChange={(e) => setVocF({ ...vocF, instruct: e.target.value })} />
+
+              <textarea {...inp} rows={vmode === 'multi' ? 5 : 3}
+                placeholder={vmode === 'multi'
+                  ? '[Speaker_1]: Bom dia!\n[Speaker_2]: Olá, tudo bem?\n[Speaker_1]: Tudo ótimo.'
+                  : 'texto da narração (aceita tags [laughter] [sigh] [sniff])'}
+                value={vtext} onChange={(e) => setVtext(e.target.value)} />
+
+              {vmode === 'design' && (
+                <div>
+                  <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
+                    voz (deixe “— qualquer —” p/ usar o padrão da fábrica)
+                  </div>
+                  <InstructPicker sel={vsel} onChange={setVsel} />
+                </div>
+              )}
+
+              {vmode === 'clone' && (
+                <div className="grid" style={{ gap: 8 }}>
+                  <label className="muted" style={{ fontSize: 12 }}>
+                    áudio de referência (3–15s; mp3/wav/m4a/ogg)
+                    <input className="input" type="file" accept="audio/*" style={{ display: 'block' }}
+                      onChange={(e) => onRefFile(e.target.files?.[0], setVref)} />
+                  </label>
+                  {vref && <div className="muted" style={{ fontSize: 12 }}>✓ {vref.name}</div>}
+                  <label className="muted" style={{ fontSize: 12 }}>
+                    <input type="checkbox" checked={vrefTextOn}
+                      onChange={(e) => setVrefTextOn(e.target.checked)} />{' '}
+                    tenho a transcrição EXATA do áudio (em branco = automático/ASR, recomendado)
+                  </label>
+                  {vrefTextOn && (
+                    <input className="input" placeholder="transcrição exata do áudio de referência"
+                      value={vrefText} onChange={(e) => setVrefText(e.target.value)} />
+                  )}
+                </div>
+              )}
+
+              {vmode === 'multi' && (
+                <div className="grid" style={{ gap: 10 }}>
+                  {vspeakers.map((s, i) => (
+                    <div key={i} className="card pad" style={{ padding: 10 }}>
+                      <div className="row" style={{ justifyContent: 'space-between' }}>
+                        <input className="input" style={{ width: 140 }} placeholder="Speaker_1"
+                          value={s.tag}
+                          onChange={(e) => setVspeakers(vspeakers.map((x, j) => j === i ? { ...x, tag: e.target.value } : x))} />
+                        <button className="btn" type="button"
+                          onClick={() => setVspeakers(vspeakers.filter((_, j) => j !== i))}>remover</button>
+                      </div>
+                      <div style={{ marginTop: 8 }}>
+                        <InstructPicker sel={s.sel}
+                          onChange={(sel) => setVspeakers(vspeakers.map((x, j) => j === i ? { ...x, sel } : x))} />
+                      </div>
+                      <label className="muted" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
+                        voz de referência (opcional — clona este speaker)
+                        <input className="input" type="file" accept="audio/*" style={{ display: 'block' }}
+                          onChange={(e) => onRefFile(e.target.files?.[0], (v) =>
+                            setVspeakers(vspeakers.map((x, j) => j === i
+                              ? { ...x, refB64: v?.b64 ?? null, refName: v?.name ?? null } : x)))} />
+                      </label>
+                      {s.refName && <div className="muted" style={{ fontSize: 12 }}>✓ {s.refName}</div>}
+                    </div>
+                  ))}
+                  <div className="row">
+                    <button className="btn" type="button"
+                      onClick={() => setVspeakers([...vspeakers,
+                        { tag: `Speaker_${vspeakers.length + 1}`, sel: EMPTY_SEL, refB64: null, refName: null }])}>
+                      + speaker
+                    </button>
+                    <label className="muted">pausa entre falas {vpause}s
+                      <input type="range" min={0} max={5} step={0.1} value={vpause}
+                        onChange={(e) => setVpause(Number(e.target.value))} /></label>
+                  </div>
+                </div>
+              )}
+
+              <div className="row">
+                <label className="muted" style={{ width: 110 }}>idioma
+                  <input className="input" style={{ width: '100%' }} value={vlang}
+                    onChange={(e) => setVlang(e.target.value)} placeholder="pt" /></label>
+                <label className="muted" style={{ width: 120 }}>velocidade
+                  <input className="input" style={{ width: '100%' }} type="number" min={0.5} max={2} step={0.05}
+                    value={vspeed} onChange={(e) => setVspeed(e.target.value)} /></label>
+              </div>
+
+              {(vmode === 'tts' || vmode === 'design') && (
+                <details>
+                  <summary className="muted" style={{ fontSize: 12, cursor: 'pointer' }}>Avançado (difusão)</summary>
+                  <div className="row" style={{ marginTop: 8 }}>
+                    <label className="muted">seed <input className="input" placeholder="opcional"
+                      value={vseed} onChange={(e) => setVseed(e.target.value)} style={{ width: 100 }} /></label>
+                    <label className="muted">num_step <input className="input" type="number" min={4} max={64}
+                      placeholder="32" value={vnumStep} onChange={(e) => setVnumStep(e.target.value)} style={{ width: 90 }} /></label>
+                    <label className="muted">guidance <input className="input" type="number" min={0} max={10} step={0.5}
+                      placeholder="2.0" value={vguid} onChange={(e) => setVguid(e.target.value)} style={{ width: 90 }} /></label>
+                  </div>
+                </details>
               )}
             </div>
           )}
