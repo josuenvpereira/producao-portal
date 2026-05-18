@@ -14,6 +14,8 @@ function degradedNotes(db: Db): string[] {
   }
 }
 
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+
 export function overview(db: Db) {
   const total = (db.prepare('SELECT COUNT(*) c FROM episodes').get() as { c: number }).c;
   const published = (
@@ -125,12 +127,67 @@ export function costSummary(db: Db) {
   const totalTokens = (
     db.prepare('SELECT COALESCE(SUM(total_tokens),0) s FROM agent_usage').get() as { s: number }
   ).s;
+  // Por squad: agrega byAgent via org.json (agente→squad). #4
+  const org = orgManifest() as {
+    squads?: Array<{ name?: string; agents?: Array<{ id: string }> }>;
+  };
+  const agentSquad = new Map<string, string>();
+  for (const sqd of org.squads ?? []) {
+    for (const a of sqd.agents ?? []) agentSquad.set(a.id, sqd.name ?? 'Squad');
+  }
+  const sacc = new Map<string, { squad: string; agents: Set<string>; tokens: number; cost: number }>();
+  for (const a of byAgent as Array<{ agent: string; tokens: number; cost_usd: number }>) {
+    const name = agentSquad.get(a.agent) ?? 'Outros';
+    const cur = sacc.get(name) ?? { squad: name, agents: new Set<string>(), tokens: 0, cost: 0 };
+    cur.agents.add(a.agent);
+    cur.tokens += a.tokens ?? 0;
+    cur.cost += a.cost_usd ?? 0;
+    sacc.set(name, cur);
+  }
+  const bySquad = [...sacc.values()]
+    .map((s) => ({ squad: s.squad, agents: s.agents.size, tokens: s.tokens, cost_usd: round2(s.cost) }))
+    .sort((a, b) => b.tokens - a.tokens);
+
+  // Timeline de custo dos crons. cron_runs tem at_ms; agent_usage NÃO tem
+  // tempo (agregado) — por isso a timeline cobre só os crons. Custo in/out
+  // via config (mesmos preços do agent_usage).
+  const p = config.openclaw;
+  const cr = db
+    .prepare('SELECT at_ms, in_tokens, out_tokens, model FROM cron_runs')
+    .all() as Array<{ at_ms: number; in_tokens: number; out_tokens: number; model: string }>;
+  const day = new Map<string, { d: string; runs: number; tokens: number; cost: number }>();
+  const mon = new Map<string, { m: string; runs: number; tokens: number; cost: number }>();
+  for (const r of cr) {
+    if (!r.at_ms) continue;
+    const iso = new Date(r.at_ms).toISOString();
+    const d = iso.slice(0, 10);
+    const m = iso.slice(0, 7);
+    const flash = /flash/i.test(r.model ?? '');
+    const cost =
+      ((r.in_tokens ?? 0) / 1e6) * (flash ? p.priceFlashIn : p.priceProIn) +
+      ((r.out_tokens ?? 0) / 1e6) * (flash ? p.priceFlashOut : p.priceProOut);
+    const tok = (r.in_tokens ?? 0) + (r.out_tokens ?? 0);
+    const dd = day.get(d) ?? { d, runs: 0, tokens: 0, cost: 0 };
+    dd.runs += 1; dd.tokens += tok; dd.cost += cost; day.set(d, dd);
+    const mm = mon.get(m) ?? { m, runs: 0, tokens: 0, cost: 0 };
+    mm.runs += 1; mm.tokens += tok; mm.cost += cost; mon.set(m, mm);
+  }
+  const byDay = [...day.values()]
+    .sort((a, b) => (a.d < b.d ? 1 : -1))
+    .slice(0, 30)
+    .map((x) => ({ ...x, cost: round2(x.cost) }));
+  const byMonth = [...mon.values()]
+    .sort((a, b) => (a.m < b.m ? 1 : -1))
+    .map((x) => ({ ...x, cost: round2(x.cost) }));
+
   return {
     estimates,
     byAgent,
+    bySquad,
+    cronTimeline: { byDay, byMonth },
     totals: {
-      ttsEstimateUsd: Math.round(totalEst * 100) / 100,
-      openclawUsd: Math.round(totalUsage * 100) / 100,
+      ttsEstimateUsd: round2(totalEst),
+      openclawUsd: round2(totalUsage),
       openclawTokens: totalTokens,
       monthlyBudgetUsd: config.cost.monthlyBudgetUsd,
       overBudget: totalEst + totalUsage > config.cost.monthlyBudgetUsd,

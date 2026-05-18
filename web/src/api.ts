@@ -164,6 +164,11 @@ export interface CostSummary {
     budget_usd: number | null;
   }>;
   byAgent: Array<{ agent: string; model: string; sessions: number; tokens: number; cost_usd: number }>;
+  bySquad: Array<{ squad: string; agents: number; tokens: number; cost_usd: number }>;
+  cronTimeline: {
+    byDay: Array<{ d: string; runs: number; tokens: number; cost: number }>;
+    byMonth: Array<{ m: string; runs: number; tokens: number; cost: number }>;
+  };
   totals: {
     ttsEstimateUsd: number;
     openclawUsd: number;

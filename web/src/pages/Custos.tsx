@@ -81,8 +81,71 @@ export function Custos() {
             </tbody>
           </table>
           <div className="muted" style={{ padding: '10px 16px', fontSize: 11 }}>
-            *Custo = tokens × preço DeepSeek configurável (DEEPSEEK_PRO/FLASH_USD_PER_1M no .env).
-            Tokens são reais; defina o preço pra ver USD.
+            *Custo = in×preço_in + out×preço_out (DEEPSEEK_&#123;PRO,FLASH&#125;_&#123;IN,OUT&#125;_USD_PER_1M
+            no .env). Tokens são reais; defina os preços pra ver USD.
+          </div>
+        </Panel>
+
+        <Panel flush title="Custo por squad" sub="agentes agregados por squad (org.json)">
+          <table className="tbl">
+            <thead><tr><th>Squad</th><th>Agentes</th><th>Tokens</th><th>Custo*</th></tr></thead>
+            <tbody>
+              {data.bySquad.length === 0 && (
+                <tr><td colSpan={4} className="muted">sem dados — rode o exporter no VPS</td></tr>
+              )}
+              {data.bySquad.map((s) => (
+                <tr key={s.squad}>
+                  <td>{s.squad}</td>
+                  <td className="mono muted">{s.agents}</td>
+                  <td className="mono">{s.tokens.toLocaleString('pt-BR')}</td>
+                  <td className="mono">{s.cost_usd ? fmtUsd(s.cost_usd) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+
+        <Panel
+          flush
+          title="Cron — custo no tempo"
+          sub="só os crons têm timestamp (agent_usage é agregado, sem tempo)"
+          right={<MiniBars values={[...data.cronTimeline.byMonth].reverse().map((x) => x.cost || 0.01)} />}
+        >
+          <table className="tbl">
+            <thead><tr><th>Mês</th><th>Runs</th><th>Tokens</th><th>Custo*</th></tr></thead>
+            <tbody>
+              {data.cronTimeline.byMonth.length === 0 && (
+                <tr><td colSpan={4} className="muted">sem execuções de cron</td></tr>
+              )}
+              {data.cronTimeline.byMonth.map((x) => (
+                <tr key={x.m}>
+                  <td className="mono">{x.m}</td>
+                  <td className="mono muted">{x.runs}</td>
+                  <td className="mono">{x.tokens.toLocaleString('pt-BR')}</td>
+                  <td className="mono">{x.cost ? fmtUsd(x.cost) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {data.cronTimeline.byDay.length > 0 && (
+            <table className="tbl">
+              <thead><tr><th>Dia (30 últimos)</th><th>Runs</th><th>Tokens</th><th>Custo*</th></tr></thead>
+              <tbody>
+                {data.cronTimeline.byDay.map((x) => (
+                  <tr key={x.d}>
+                    <td className="mono">{x.d}</td>
+                    <td className="mono muted">{x.runs}</td>
+                    <td className="mono">{x.tokens.toLocaleString('pt-BR')}</td>
+                    <td className="mono">{x.cost ? fmtUsd(x.cost) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div className="muted" style={{ padding: '10px 16px', fontSize: 11 }}>
+            Custo por <b>canal/episódio</b>: o painel de TTS acima já é por episódio;
+            o custo de agentes não tem associação a episódio/canal nos dados atuais
+            (sessions/cron não trazem episodeId) — fica para quando houver.
           </div>
         </Panel>
       </div>
