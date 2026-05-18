@@ -43,9 +43,14 @@ export function Assets() {
           <thead><tr><th>Episódio</th><th>Tipo</th><th>Arquivo</th><th>Tamanho</th><th>Preview</th></tr></thead>
           <tbody>
             {rows.map((a) => {
-              const url = api.assetUrl(pubRel(a.rel_path));
-              const isImg = /\.(png|jpe?g|webp)$/i.test(a.rel_path);
-              const isAud = /\.(mp3|wav|m4a)$/i.test(a.rel_path);
+              // Itens da biblioteca SFX exportados: arquivo vive no volume do
+              // portal, servido pelo endpoint SFX (não pelo /repo read-only).
+              const sfxId = a.rel_path.startsWith('sfx-library/')
+                ? a.rel_path.replace(/^sfx-library\//, '').replace(/\.mp3$/, '')
+                : null;
+              const url = sfxId ? api.sfxAudioUrl(sfxId) : api.assetUrl(pubRel(a.rel_path));
+              const isImg = !sfxId && /\.(png|jpe?g|webp)$/i.test(a.rel_path);
+              const isAud = !!sfxId || /\.(mp3|wav|m4a)$/i.test(a.rel_path);
               return (
                 <tr key={a.rel_path}>
                   <td className="mono muted">{a.episode_id}</td>

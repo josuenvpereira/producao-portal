@@ -24,6 +24,7 @@ export interface SfxMeta {
   promptEn: string | null;
   ts: number;
   bytes: number;
+  exported?: boolean; // marcado p/ aparecer na aba Assets (read-model)
 }
 
 function ensureDir(): void {
@@ -68,6 +69,25 @@ export function audioPath(id: string): string | null {
     /* não existe */
   }
   return null;
+}
+
+/**
+ * Marca/desmarca um item como exportado p/ Assets (persistido no <id>.json).
+ * Retorna o meta atualizado ou null se id inválido / inexistente.
+ */
+export function setExported(id: string, exported: boolean): SfxMeta | null {
+  if (!ID_RE.test(id)) return null;
+  const metaPath = join(LIB, `${id}.json`);
+  if (!existsSync(metaPath)) return null;
+  let meta: SfxMeta;
+  try {
+    meta = JSON.parse(readFileSync(metaPath, 'utf8')) as SfxMeta;
+  } catch {
+    return null;
+  }
+  meta.exported = exported;
+  writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+  return meta;
 }
 
 /**

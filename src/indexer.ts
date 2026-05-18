@@ -9,6 +9,7 @@ import { fetchRenderData } from './adapters/githubActions.js';
 import { fetchOpenClawUsage } from './adapters/openclawUsage.js';
 import { readOpenClawSnapshot } from './adapters/openclawExport.js';
 import { deriveCosts } from './adapters/costDerive.js';
+import { listLibrary } from './sfx/library.js';
 import type { EpisodeProjection } from './adapters/types.js';
 
 // Indexer: projeta GitHub (repo+Actions) e OpenClaw → read-model SQLite.
@@ -174,6 +175,25 @@ async function doIndex(): Promise<IndexResult> {
     );
     const now = new Date().toISOString();
     for (const c of costs.episodes) insC.run(c.episodeId, c.ttsChars, c.ttsCostUsd, now);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+
+  // SFX exportados → assets. Read-model reconstruível: a verdade são os
+  // <id>.json da biblioteca; só os `exported` entram na aba Assets.
+  db.exec('BEGIN');
+  try {
+    db.exec("DELETE FROM assets WHERE rel_path LIKE 'sfx-library/%'");
+    const insSfx = db.prepare(
+      `INSERT INTO assets (episode_id, kind, rel_path, bytes, mtime) VALUES ('__sfx__',?,?,?,?)
+       ON CONFLICT(rel_path) DO UPDATE SET kind=excluded.kind, bytes=excluded.bytes, mtime=excluded.mtime`,
+    );
+    for (const m of listLibrary()) {
+      if (!m.exported) continue;
+      insSfx.run(m.kind, `sfx-library/${m.id}.mp3`, m.bytes, new Date(m.ts).toISOString());
+    }
     db.exec('COMMIT');
   } catch (err) {
     db.exec('ROLLBACK');

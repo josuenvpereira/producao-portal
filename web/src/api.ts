@@ -59,6 +59,11 @@ export const api = {
   sfxAudioUrl: (id: string) => `/api/sfx/library/${encodeURIComponent(id)}/audio`,
   sfxDelete: (id: string) =>
     req<{ ok: true }>(`/sfx/library/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  sfxExport: (id: string, exported: boolean) =>
+    req<{ ok: true; exported: boolean }>(
+      `/sfx/library/${encodeURIComponent(id)}/export`,
+      { method: 'POST', body: JSON.stringify({ exported }) },
+    ),
   async sfxGenerate(
     kind: 'sfx' | 'bed' | 'vocal',
     body: Record<string, unknown>,
@@ -221,6 +226,7 @@ export interface SfxMeta {
   promptEn: string | null;
   ts: number;
   bytes: number;
+  exported?: boolean;
 }
 export interface OrgAgent {
   id: string;

@@ -1,7 +1,15 @@
 import { createReadStream } from 'node:fs';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { sfxStatus, sfxCatalog, sfxGenerate, SfxError } from '../sfx/gateway.js';
-import { saveGeneration, listLibrary, audioPath, deleteGeneration } from '../sfx/library.js';
+import {
+  saveGeneration,
+  listLibrary,
+  audioPath,
+  deleteGeneration,
+  setExported,
+} from '../sfx/library.js';
+
+const sfxAssetRel = (id: string): string => `sfx-library/${id}.mp3`;
 
 // Proxy fino p/ a SFX Factory. Chave injetada server-side (nunca no browser).
 // Registrado no escopo PROTEGIDO (cookie de sessão já gateia /api/*).
@@ -102,7 +110,50 @@ export async function sfxRoutes(app: FastifyInstance): Promise<void> {
       if (!deleteGeneration(req.params.id)) {
         return reply.code(404).send({ error: 'áudio não encontrado' });
       }
+      // mantém o read-model consistente: se estava exportado, sai dos Assets.
+      app.db.prepare('DELETE FROM assets WHERE rel_path=?').run(sfxAssetRel(req.params.id));
       return { ok: true };
+    },
+  );
+
+  // Exporta/desexporta p/ a aba Assets. Não move bytes: marca no <id>.json e
+  // projeta a linha no read-model na hora (o indexer reconcilia depois).
+  app.post(
+    '/api/sfx/library/:id/export',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: { id: { type: 'string', maxLength: 64 } },
+        },
+        body: {
+          type: 'object',
+          required: ['exported'],
+          properties: { exported: { type: 'boolean' } },
+        },
+      },
+    },
+    async (
+      req: FastifyRequest<{ Params: { id: string }; Body: { exported: boolean } }>,
+      reply,
+    ) => {
+      const meta = setExported(req.params.id, req.body.exported);
+      if (!meta) return reply.code(404).send({ error: 'áudio não encontrado' });
+      const rel = sfxAssetRel(meta.id);
+      if (req.body.exported) {
+        app.db
+          .prepare(
+            `INSERT INTO assets (episode_id, kind, rel_path, bytes, mtime)
+             VALUES ('__sfx__',?,?,?,?)
+             ON CONFLICT(rel_path) DO UPDATE SET
+               kind=excluded.kind, bytes=excluded.bytes, mtime=excluded.mtime`,
+          )
+          .run(meta.kind, rel, meta.bytes, new Date(meta.ts).toISOString());
+      } else {
+        app.db.prepare('DELETE FROM assets WHERE rel_path=?').run(rel);
+      }
+      return { ok: true, exported: req.body.exported };
     },
   );
 }

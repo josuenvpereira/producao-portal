@@ -315,6 +315,15 @@ export function Sfx() {
     }
   }
 
+  async function exportItem(id: string, exported: boolean) {
+    try {
+      await api.sfxExport(id, exported);
+      reloadLib();
+    } catch {
+      setErr(exported ? 'Falha ao exportar p/ Assets.' : 'Falha ao remover de Assets.');
+    }
+  }
+
   const inp = { className: 'input', style: { width: '100%' } };
   const VMODES: Array<[VMode, string]> = [
     ['tts', 'TTS'],
@@ -555,6 +564,11 @@ export function Sfx() {
                       <td>
                         <audio controls preload="none" src={api.sfxAudioUrl(m.id)} style={{ width: 170, height: 32, verticalAlign: 'middle' }} />
                         <a className="muted" href={api.sfxAudioUrl(m.id)} download={`${m.id}.mp3`} style={{ fontSize: 11, marginLeft: 6 }}>baixar</a>
+                        <button className="muted" onClick={() => exportItem(m.id, !m.exported)}
+                          title={m.exported ? 'Remover dos Assets' : 'Exportar p/ Assets'}
+                          style={{ fontSize: 11, marginLeft: 8, color: m.exported ? 'var(--success)' : undefined }}>
+                          {m.exported ? '✓ Assets' : '→ Assets'}
+                        </button>
                         <button className="muted" onClick={() => del(m.id)} title="Apagar da biblioteca"
                           style={{ fontSize: 11, marginLeft: 8, color: 'var(--danger)' }}>apagar</button>
                       </td>
