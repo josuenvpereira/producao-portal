@@ -122,7 +122,7 @@ type RawSessions =
 
 export function readOpenClawSnapshot(
   dir: string,
-  price: { pro: number; flash: number },
+  price: { proIn: number; proOut: number; flashIn: number; flashOut: number },
 ): AdapterResult<OpenClawSnapshot> {
   const notes: string[] = [];
   const empty: OpenClawSnapshot = { crons: [], cronRuns: [], usage: [], exportedAt: null };
@@ -198,8 +198,11 @@ export function readOpenClawSnapshot(
     acc.set(key, cur);
   }
   const usage = [...acc.values()].map((u) => {
-    const per1M = /flash/i.test(u.model) ? price.flash : price.pro;
-    return { ...u, costUsd: Math.round((u.totalTokens / 1e6) * per1M * 100) / 100 };
+    const flash = /flash/i.test(u.model);
+    const inP = flash ? price.flashIn : price.proIn;
+    const outP = flash ? price.flashOut : price.proOut;
+    const cost = (u.inputTokens / 1e6) * inP + (u.outputTokens / 1e6) * outP;
+    return { ...u, costUsd: Math.round(cost * 100) / 100 };
   });
   usage.sort((a, b) => b.totalTokens - a.totalTokens);
 

@@ -66,7 +66,7 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 describe('readOpenClawSnapshot', () => {
   it('parseia crons (estado da última execução)', () => {
-    const { data } = readOpenClawSnapshot(dir, { pro: 1, flash: 0.5 });
+    const { data } = readOpenClawSnapshot(dir, { proIn: 1, proOut: 2, flashIn: 0.5, flashOut: 1 });
     expect(data.crons).toHaveLength(2);
     const g = data.crons.find((c) => c.id === JID)!;
     expect(g.agentId).toBe('gerente-com');
@@ -77,7 +77,7 @@ describe('readOpenClawSnapshot', () => {
   });
 
   it('parseia execuções (esteira) + agente do sessionKey', () => {
-    const { data } = readOpenClawSnapshot(dir, { pro: 1, flash: 0.5 });
+    const { data } = readOpenClawSnapshot(dir, { proIn: 1, proOut: 2, flashIn: 0.5, flashOut: 1 });
     expect(data.cronRuns).toHaveLength(1);
     const r = data.cronRuns[0]!;
     expect(r.agentId).toBe('gerente-com');
@@ -86,18 +86,18 @@ describe('readOpenClawSnapshot', () => {
   });
 
   it('agrega tokens por agente/modelo + custo pelo preço configurável', () => {
-    const { data } = readOpenClawSnapshot(dir, { pro: 1, flash: 0.5 });
+    const { data } = readOpenClawSnapshot(dir, { proIn: 1, proOut: 2, flashIn: 0.5, flashOut: 1 });
     const an = data.usage.find((u) => u.agentId === 'analista-com')!;
     expect(an.sessions).toBe(2);
     expect(an.totalTokens).toBe(35850);
     const main = data.usage.find((u) => u.agentId === 'main')!;
     expect(main.totalTokens).toBe(23408);
-    expect(main.costUsd).toBeCloseTo(0.02, 2); // 23408/1e6 * 1
+    expect(main.costUsd).toBeCloseTo(0.02, 2); // in 23408/1e6*1 + out 215/1e6*2 ≈ 0.0238
     expect(data.exportedAt).toBe('2026-05-17T12:00:00Z');
   });
 
   it('degrada (sem lançar) quando o dir de export não existe', () => {
-    const r = readOpenClawSnapshot(join(dir, 'nao-existe'), { pro: 0, flash: 0 });
+    const r = readOpenClawSnapshot(join(dir, 'nao-existe'), { proIn: 0, proOut: 0, flashIn: 0, flashOut: 0 });
     expect(r.degraded).toBe(true);
     expect(r.data.crons).toEqual([]);
   });

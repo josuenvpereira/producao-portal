@@ -64,9 +64,13 @@ export const config = {
   openclaw: {
     // snapshots gerados por scripts/openclaw-export.sh (host) — montado :ro
     exportDir: absDir(optional('OPENCLAW_EXPORT_DIR', './data/openclaw-export')),
-    // preço DeepSeek (USD por 1M tokens) p/ estimar custo — Josué configura
-    priceProPer1M: Number(optional('DEEPSEEK_PRO_USD_PER_1M', '0')),
-    priceFlashPer1M: Number(optional('DEEPSEEK_FLASH_USD_PER_1M', '0')),
+    // preço DeepSeek (USD/1M tokens) por modelo e direção. 0 = só tokens.
+    // Ref. mai/2026: Flash 0.14 in / 0.28 out; Pro promo 0.435/0.87 (até
+    // 2026-05-31) ou cheio 1.74/3.48. Josué configura no .env do VPS.
+    priceProIn: Number(optional('DEEPSEEK_PRO_IN_USD_PER_1M', '0')),
+    priceProOut: Number(optional('DEEPSEEK_PRO_OUT_USD_PER_1M', '0')),
+    priceFlashIn: Number(optional('DEEPSEEK_FLASH_IN_USD_PER_1M', '0')),
+    priceFlashOut: Number(optional('DEEPSEEK_FLASH_OUT_USD_PER_1M', '0')),
   },
 
   sfx: {

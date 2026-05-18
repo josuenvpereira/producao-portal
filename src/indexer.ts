@@ -236,8 +236,10 @@ async function doIndex(): Promise<IndexResult> {
 
   // OpenClaw snapshot (crons + esteira Comunicação + custo por agente)
   const oc = readOpenClawSnapshot(config.openclaw.exportDir, {
-    pro: config.openclaw.priceProPer1M,
-    flash: config.openclaw.priceFlashPer1M,
+    proIn: config.openclaw.priceProIn,
+    proOut: config.openclaw.priceProOut,
+    flashIn: config.openclaw.priceFlashIn,
+    flashOut: config.openclaw.priceFlashOut,
   });
   if (oc.degraded) degraded.push(...oc.notes);
   db.exec('BEGIN');
