@@ -1,7 +1,7 @@
 import { createReadStream } from 'node:fs';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { sfxStatus, sfxCatalog, sfxGenerate, SfxError } from '../sfx/gateway.js';
-import { saveGeneration, listLibrary, audioPath } from '../sfx/library.js';
+import { saveGeneration, listLibrary, audioPath, deleteGeneration } from '../sfx/library.js';
 
 // Proxy fino p/ a SFX Factory. Chave injetada server-side (nunca no browser).
 // Registrado no escopo PROTEGIDO (cookie de sessão já gateia /api/*).
@@ -83,6 +83,26 @@ export async function sfxRoutes(app: FastifyInstance): Promise<void> {
       reply.header('Content-Type', 'audio/mpeg');
       reply.header('Cache-Control', 'private, max-age=86400');
       return reply.send(createReadStream(p));
+    },
+  );
+
+  // Apaga um item da biblioteca (escopo protegido: só sessão válida).
+  app.delete(
+    '/api/sfx/library/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: { id: { type: 'string', maxLength: 64 } },
+        },
+      },
+    },
+    async (req: FastifyRequest<{ Params: { id: string } }>, reply) => {
+      if (!deleteGeneration(req.params.id)) {
+        return reply.code(404).send({ error: 'áudio não encontrado' });
+      }
+      return { ok: true };
     },
   );
 }

@@ -57,6 +57,8 @@ export const api = {
   sfxCatalog: () => req<SfxCatalog>('/sfx/catalog'),
   sfxLibrary: () => req<SfxMeta[]>('/sfx/library'),
   sfxAudioUrl: (id: string) => `/api/sfx/library/${encodeURIComponent(id)}/audio`,
+  sfxDelete: (id: string) =>
+    req<{ ok: true }>(`/sfx/library/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   async sfxGenerate(
     kind: 'sfx' | 'bed' | 'vocal',
     body: Record<string, unknown>,

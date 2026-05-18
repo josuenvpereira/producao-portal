@@ -5,6 +5,7 @@ import {
   readdirSync,
   existsSync,
   statSync,
+  rmSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -67,4 +68,26 @@ export function audioPath(id: string): string | null {
     /* não existe */
   }
   return null;
+}
+
+/**
+ * Apaga <id>.mp3 + <id>.json da biblioteca. ID_RE barra path-traversal
+ * (mesmo guarda do audioPath) — só remove os 2 arquivos do próprio id,
+ * nunca fora de LIB. Retorna true se removeu algo.
+ */
+export function deleteGeneration(id: string): boolean {
+  if (!ID_RE.test(id)) return false;
+  let removed = false;
+  for (const ext of ['mp3', 'json'] as const) {
+    const p = join(LIB, `${id}.${ext}`);
+    try {
+      if (existsSync(p)) {
+        rmSync(p);
+        removed = true;
+      }
+    } catch {
+      /* já removido / sem permissão — ignora */
+    }
+  }
+  return removed;
 }

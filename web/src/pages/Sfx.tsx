@@ -305,6 +305,16 @@ export function Sfx() {
     }
   }
 
+  async function del(id: string) {
+    if (!window.confirm('Apagar este áudio da biblioteca? Não dá pra desfazer.')) return;
+    try {
+      await api.sfxDelete(id);
+      reloadLib();
+    } catch {
+      setErr('Falha ao apagar da biblioteca.');
+    }
+  }
+
   const inp = { className: 'input', style: { width: '100%' } };
   const VMODES: Array<[VMode, string]> = [
     ['tts', 'TTS'],
@@ -545,6 +555,8 @@ export function Sfx() {
                       <td>
                         <audio controls preload="none" src={api.sfxAudioUrl(m.id)} style={{ width: 170, height: 32, verticalAlign: 'middle' }} />
                         <a className="muted" href={api.sfxAudioUrl(m.id)} download={`${m.id}.mp3`} style={{ fontSize: 11, marginLeft: 6 }}>baixar</a>
+                        <button className="muted" onClick={() => del(m.id)} title="Apagar da biblioteca"
+                          style={{ fontSize: 11, marginLeft: 8, color: 'var(--danger)' }}>apagar</button>
                       </td>
                     </tr>
                   );
