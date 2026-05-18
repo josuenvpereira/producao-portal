@@ -105,6 +105,11 @@ interface RawRuns {
     }
   >;
 }
+// Formato VALIDADO contra amostra real do VPS (2026-05-18,
+// `openclaw sessions --all-agents --json`): objeto com `sessions[]`, cada
+// item = { agentId, model, inputTokens, outputTokens, totalTokens (pode ser
+// null), kind, key, ... }. O parser abaixo lê exatamente esses campos — não
+// mudar sem reconfirmar amostra (o roster/formato já foi corrigido 2×).
 type RawSessions =
   | Array<Record<string, unknown>>
   | { sessions?: Array<Record<string, unknown>> };
