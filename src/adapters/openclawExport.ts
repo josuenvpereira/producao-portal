@@ -85,11 +85,17 @@ interface RawCron {
     };
   }>;
 }
+// Formato VALIDADO contra amostra real do VPS (2026-05-18,
+// `openclaw cron runs --id <id> --json`): a saída tem `entries[]` (NÃO
+// `runs[]`). O exporter salva `cron-runs.json` = { jobs: { <jobId>: <saída
+// crua> } }, logo o array é `jobs[<id>].entries`. Cada entry =
+// { ts, runAtMs, jobId, action, status, summary, durationMs, model,
+//   usage:{input_tokens,output_tokens,total_tokens}, sessionId, sessionKey }.
 interface RawRuns {
   jobs?: Record<
     string,
     {
-      runs?: Array<{
+      entries?: Array<{
         ts?: number;
         runAtMs?: number;
         jobId?: string;
@@ -154,7 +160,7 @@ export function readOpenClawSnapshot(
   const cronRuns: CronRun[] = [];
   const rawRuns = readJson<RawRuns>(join(dir, 'cron-runs.json'));
   for (const [jobId, blk] of Object.entries(rawRuns?.jobs ?? {})) {
-    for (const r of blk.runs ?? []) {
+    for (const r of blk.entries ?? []) {
       cronRuns.push({
         jobId: r.jobId ?? jobId,
         agentId: agentFromSessionKey(r.sessionKey ?? ''),

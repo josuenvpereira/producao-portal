@@ -31,18 +31,21 @@ beforeAll(() => {
   writeFileSync(
     join(dir, 'cron-runs.json'),
     JSON.stringify({
+      // formato REAL do VPS: jobs[<id>] = saída crua de `cron runs`, que
+      // tem `entries[]` (não `runs[]`) + total/offset/limit/hasMore.
       jobs: {
         [JID]: {
-          runs: [
+          entries: [
             {
               ts: 1779015600027, runAtMs: 1779015600027, jobId: JID, action: 'finished',
               status: 'ok', summary: '📋 Slot 09h concluído. 3 cards no Backlog.',
-              durationMs: 372046, model: 'deepseek-v4-pro', provider: 'deepseek',
+              durationMs: 372046, nextRunAtMs: 1779100000000, model: 'deepseek-v4-pro',
+              provider: 'deepseek',
               usage: { input_tokens: 26906, output_tokens: 8782, total_tokens: 51964 },
               sessionId: 'sid1', sessionKey: `agent:gerente-com:cron:${JID}:run:sid1`,
             },
           ],
-          total: 16, hasMore: true,
+          total: 16, offset: 0, limit: 50, hasMore: true, nextOffset: 2,
         },
       },
     }),
