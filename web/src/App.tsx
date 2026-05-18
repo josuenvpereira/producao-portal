@@ -32,13 +32,26 @@ const CRUMB: Record<string, string> = {
   '/assets': 'Assets',
 };
 
-function Appbar({ onToggleTheme, theme }: { onToggleTheme: () => void; theme: string }) {
+function Appbar({
+  onToggleTheme,
+  theme,
+  onMenu,
+}: {
+  onToggleTheme: () => void;
+  theme: string;
+  onMenu: () => void;
+}) {
   const { pathname } = useLocation();
   const label = pathname.startsWith('/episodios/') ? 'Episódio' : (CRUMB[pathname] ?? 'Overview');
   return (
     <div className="appbar">
-      <div className="crumb">
-        Produção <span style={{ opacity: 0.5 }}>›</span> <b>{label}</b>
+      <div className="row" style={{ gap: 10 }}>
+        <button className="btn icon nav-toggle" onClick={onMenu} aria-label="Abrir menu">
+          ☰
+        </button>
+        <div className="crumb">
+          Produção <span style={{ opacity: 0.5 }}>›</span> <b>{label}</b>
+        </div>
       </div>
       <div className="row">
         <span className="chip">ao vivo · SSE</span>
@@ -59,12 +72,22 @@ function Shell() {
   const [tick, setTick] = useState(0);
   useSse(() => setTick((t) => t + 1));
   const [theme, toggleTheme] = useTheme();
+  const [navOpen, setNavOpen] = useState(false);
   const link = ({ isActive }: { isActive: boolean }) => 'navlink' + (isActive ? ' active' : '');
 
   return (
     <RefreshCtx.Provider value={tick}>
       <div className="app">
-        <nav className="sidebar">
+        <div
+          className={'nav-backdrop' + (navOpen ? ' show' : '')}
+          onClick={() => setNavOpen(false)}
+        />
+        <nav
+          className={'sidebar' + (navOpen ? ' open' : '')}
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest('a')) setNavOpen(false);
+          }}
+        >
           <div className="org">
             <div className="logo">P</div>
             <div>
@@ -105,7 +128,7 @@ function Shell() {
         </nav>
 
         <div className="main">
-          <Appbar onToggleTheme={toggleTheme} theme={theme} />
+          <Appbar onToggleTheme={toggleTheme} theme={theme} onMenu={() => setNavOpen(true)} />
           <div className="content">
             <Routes>
               <Route path="/" element={<Overview />} />
