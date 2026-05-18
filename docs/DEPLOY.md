@@ -77,7 +77,6 @@ Preencha no `.env`:
 - `GITHUB_TOKEN=` → PAT fine-grained **read-only** (`Contents:read` +
   `Actions:read`) do repo `josuenvpereira/remotion_project`
 - `GITHUB_WEBHOOK_SECRET=` → uma string aleatória (use 4b de novo)
-- `OPENCLAW_USAGE_URL=https://claw.jotaene.ia.br/usage`
 - `PUBLIC_ORIGIN=https://producao.jotaene.ia.br`
 - `PORTAL_TRAEFIK_NETWORK=` → rede do passo 2
 - `PORTAL_TRAEFIK_CERTRESOLVER=` → certresolver do passo 2
@@ -142,8 +141,10 @@ atualiza (o webhook agenda reindexação; SSE empurra o refresh).
 - **Esteira vazia:** `PORTAL_REPO_DIR` não aponta pro repo do supervisor, ou
   rode o indexer (passo 7). Sem `GITHUB_TOKEN`, runs de render ficam vazias
   (degrada, não quebra).
-- **Custos por agente vazios:** esperado — `/usage` do OpenClaw é HTML; o
-  adapter degrada até o parser ser fechado (ver ADR 0003 / openclawUsage.ts).
+- **Custos por agente vazios:** o exporter (`scripts/openclaw-export.sh`,
+  cron no host) ainda não rodou ou `sessions.json` não bate com o parser de
+  `openclawExport.ts`. Fonte única de custo/uso é o exporter (o `/usage`
+  HTML foi aposentado).
 - **Permissão negada no /repo:** o container roda como UID 1000; garanta que
   `PORTAL_REPO_DIR` seja legível por ele (é montado `:ro`).
 

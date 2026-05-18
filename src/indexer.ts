@@ -6,7 +6,6 @@ import { logger } from './logger.js';
 import { openDb, setMeta, type Db } from './db/db.js';
 import { readRepoSnapshot } from './adapters/repoFs.js';
 import { fetchRenderData } from './adapters/githubActions.js';
-import { fetchOpenClawUsage } from './adapters/openclawUsage.js';
 import { readOpenClawSnapshot } from './adapters/openclawExport.js';
 import { deriveCosts } from './adapters/costDerive.js';
 import { listLibrary } from './sfx/library.js';
@@ -122,7 +121,6 @@ export interface IndexResult {
   episodes: number;
   runs: number;
   artifacts: number;
-  usageRows: number;
   crons: number;
   cronRuns: number;
   agentUsage: number;
@@ -236,29 +234,6 @@ async function doIndex(): Promise<IndexResult> {
     throw err;
   }
 
-  // OpenClaw /usage — degrada sozinho.
-  const usage = await fetchOpenClawUsage({
-    usageUrl: config.openclaw.usageUrl,
-    token: config.openclaw.usageToken,
-  });
-  if (usage.degraded) degraded.push(...usage.notes);
-  db.exec('BEGIN');
-  try {
-    const insU = db.prepare(
-      `INSERT INTO token_usage (id, at, period, agent, source, tokens, cost_usd, raw_json)
-       VALUES (?,?,?,?,?,?,?,?)
-       ON CONFLICT(id) DO UPDATE SET
-         at=excluded.at, tokens=excluded.tokens, cost_usd=excluded.cost_usd, raw_json=excluded.raw_json`,
-    );
-    for (const u of usage.data) {
-      insU.run(u.id, u.at, u.period, u.agent, u.source, u.tokens, u.costUsd, JSON.stringify(u.raw));
-    }
-    db.exec('COMMIT');
-  } catch (err) {
-    db.exec('ROLLBACK');
-    throw err;
-  }
-
   // OpenClaw snapshot (crons + esteira Comunicação + custo por agente)
   const oc = readOpenClawSnapshot(config.openclaw.exportDir, {
     pro: config.openclaw.priceProPer1M,
@@ -304,7 +279,6 @@ async function doIndex(): Promise<IndexResult> {
     episodes: repo.data.episodes.length,
     runs: gh.data.runs.length,
     artifacts: gh.data.artifacts.length,
-    usageRows: usage.data.length,
     crons: oc.data.crons.length,
     cronRuns: oc.data.cronRuns.length,
     agentUsage: oc.data.usage.length,

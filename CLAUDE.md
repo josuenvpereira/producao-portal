@@ -137,7 +137,7 @@ Manter **typecheck limpo + testes verdes + web build** sempre.
 |---|---|
 | `src/server.ts` · `src/config.ts` | bootstrap · config 12-factor (`.env`) |
 | `src/auth/` | `key.ts` (scrypt, tempo-constante, agnóstico de formato) · cookie |
-| `src/adapters/` | `repoFs` · `githubActions`(+vault) · `openclawExport` · `costDerive` · `openclawUsage`(legado) |
+| `src/adapters/` | `repoFs` · `githubActions`(+vault) · `openclawExport`(crons+custo p/ agente) · `costDerive`(TTS) |
 | `src/db/` | `migrations.ts` · `queries.ts` · `db.ts` (`node:sqlite`) |
 | `src/indexer.ts` | projeção fontes → SQLite (idempotente) |
 | `src/routes/` | `api` · `assets` · `sse` · `webhook` · `sfx` · `spa` |

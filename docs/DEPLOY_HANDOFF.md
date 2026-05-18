@@ -92,9 +92,9 @@ O modelo evoluiu; o DEPLOY.md antigo está parcialmente defasado. Verdade atual:
 >    `docker exec msu-producao-portal wget -qO- http://10.8.0.2:8000/health`.
 >    Se não alcançar: rota/iptables no host p/ a sub-rede WG, ou ajustar a
 >    rede do compose. **Não** usar host-network (quebra labels do Traefik).
-> 3. **`/usage` do OpenClaw é HTML** (legado) — o custo agora vem do
->    **exporter** (`sessions.json`), não do `/usage`. As vars
->    `OPENCLAW_USAGE_*` são legado/no-op; pode deixar em branco.
+> 3. **Custo por agente vem do exporter** (`scripts/openclaw-export.sh` →
+>    `sessions.json`). O `/usage` HTML foi **aposentado** (adapter e vars
+>    `OPENCLAW_USAGE_*` removidos) — fonte única é o exporter.
 
 ## 4. Segredos & env (preencher no `.env` do host, NUNCA no git)
 

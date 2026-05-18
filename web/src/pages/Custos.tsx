@@ -27,7 +27,7 @@ export function Custos() {
           chart={<MiniBars values={estBars.length ? estBars : [1]} />}
           foot={<>{data.estimates.length} episódio(s)</>}
         />
-        <Kpi label="Tokens OpenClaw" value={fmtUsd(t.openclawUsd)} foot={<>claw.jotaene.ia.br/usage</>} />
+        <Kpi label="Tokens OpenClaw" value={fmtUsd(t.openclawUsd)} foot={<>exporter (sessions por agente)</>} />
         <Kpi label="Teto mensal" value={fmtUsd(t.monthlyBudgetUsd)} foot={<>orçamento configurado</>} />
         <Kpi
           label="Status"
