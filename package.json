@@ -14,7 +14,8 @@
     "indexer": "tsx src/indexer.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sfx:mock": "node scripts/sfx-mock.mjs"
   },
   "dependencies": {
     "@fastify/cookie": "^10.0.1",
