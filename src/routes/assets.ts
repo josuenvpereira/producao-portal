@@ -1,5 +1,5 @@
 import { createReadStream, statSync } from 'node:fs';
-import { resolve, sep, extname } from 'node:path';
+import { resolve, sep, extname, isAbsolute } from 'node:path';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { config } from '../config.js';
 import { audit } from '../audit.js';
@@ -23,6 +23,9 @@ const MIME: Record<string, string> = {
 };
 
 function safeResolve(relRaw: string): string | null {
+  // Caminho absoluto faria resolve() descartar PUBLIC_ROOT. Defesa em camadas:
+  // o prefixo abaixo já barraria, mas rejeitar cedo é mais robusto.
+  if (isAbsolute(relRaw)) return null;
   const abs = resolve(PUBLIC_ROOT, relRaw.replace(/^[/\\]+/, ''));
   if (abs !== PUBLIC_ROOT && !abs.startsWith(PUBLIC_ROOT + sep)) return null;
   return abs;

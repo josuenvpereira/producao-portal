@@ -128,7 +128,21 @@ export interface IndexResult {
   degraded: string[];
 }
 
-export async function runIndexer(): Promise<IndexResult> {
+let inFlight: Promise<IndexResult> | null = null;
+
+// Serializa execuções concorrentes (webhook debounced + CLI): duas indexações
+// simultâneas fariam o `DELETE FROM cron_*` + re-INSERT concorrer, deixando a
+// tabela momentaneamente vazia. Chamadas durante uma execução em curso
+// recebem o resultado dela.
+export function runIndexer(): Promise<IndexResult> {
+  if (inFlight) return inFlight;
+  inFlight = doIndex().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function doIndex(): Promise<IndexResult> {
   const db = openDb(config.storage.dbPath);
   const degraded: string[] = [];
 

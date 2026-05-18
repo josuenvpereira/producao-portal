@@ -123,6 +123,15 @@ describe('assets — anti path-traversal', () => {
     expect(res.statusCode).not.toBe(200);
   });
 
+  it('rejeita caminho absoluto (400)', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/assets/file?path=' + encodeURIComponent('/etc/passwd'),
+      headers: { cookie },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
   it('exige sessão p/ assets', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/assets/file?path=x.png' });
     expect(res.statusCode).toBe(401);

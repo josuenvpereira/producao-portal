@@ -1,6 +1,7 @@
 import { argv } from 'node:process';
 import { pathToFileURL } from 'node:url';
 import Fastify from 'fastify';
+import type { FastifyError } from 'fastify';
 import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
@@ -30,6 +31,21 @@ export async function buildServer() {
       /* já fechado */
     }
     done();
+  });
+
+  // Resposta de erro uniforme. 5xx → corpo genérico (stack só no log, nunca
+  // no corpo); 4xx (ex.: validação de schema) pode expor a mensagem.
+  app.setErrorHandler((err: FastifyError, req, reply) => {
+    const status = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
+    if (status >= 500) req.log.error(err);
+    else req.log.warn({ err: err.message, code: err.code }, 'erro de request');
+    reply
+      .code(status)
+      .send(
+        status >= 500
+          ? { error: 'internal_error' }
+          : { error: err.code ?? 'bad_request', message: err.message },
+      );
   });
 
   // Parser JSON que TAMBÉM guarda o raw (necessário p/ HMAC do webhook),
@@ -100,6 +116,18 @@ async function main(): Promise<void> {
   const app = await buildServer();
   if (!config.isProd && !config.auth.accessKeyHash) {
     app.log.warn('PORTAL_ACCESS_KEY_HASH vazio (dev). Rode: node scripts/gen-portal-key.js');
+  }
+  // CD faz `docker compose up -d --build` → SIGTERM no container. Sem isto o
+  // hook onClose (fecha SQLite/WAL) não dispara e o SSE é cortado abrupto.
+  // Sem process.exit() explícito: deixa o loop drenar (padrão do indexer.ts).
+  for (const sig of ['SIGTERM', 'SIGINT'] as const) {
+    process.once(sig, () => {
+      app.log.info({ sig }, 'sinal recebido — encerrando');
+      void app.close().catch((err) => {
+        app.log.error(err, 'erro no shutdown');
+        process.exitCode = 1;
+      });
+    });
   }
   try {
     await app.listen({ port: config.port, host: '0.0.0.0' });
