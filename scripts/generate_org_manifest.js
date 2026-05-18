@@ -94,7 +94,7 @@ function build() {
   return {
     schemaVersion: 2,
     generatedAt: new Date().toISOString(),
-    project: 'My Storage Units',
+    project: 'Jotaene Serviços',
     ceo: { ...CEO, ...(overrides[CEO.id] || {}) },
     pipeline: PIPELINE,
     states: PIPELINE_STATES,
