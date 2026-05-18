@@ -24,6 +24,9 @@ export async function sfxRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/sfx/:kind',
     {
+      // Voice Clone / Multi-Speaker enviam áudio de referência em base64
+      // (até ~16MB); o bodyLimit global do server é 1MB — só esta rota sobe.
+      bodyLimit: 32 * 1024 * 1024,
       schema: {
         params: {
           type: 'object',
@@ -54,7 +57,9 @@ export async function sfxRoutes(app: FastifyInstance): Promise<void> {
       } catch (e) {
         const err = e as SfxError;
         req.log.warn({ kind, status: err.status }, 'sfx gen falhou');
-        return reply.code(err.status ?? 502).send({ error: err.message });
+        const payload: { error: string; detail?: unknown } = { error: err.message };
+        if (err.detail !== undefined) payload.detail = err.detail;
+        return reply.code(err.status ?? 502).send(payload);
       }
     },
   );

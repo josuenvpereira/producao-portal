@@ -18,9 +18,26 @@ export interface SfxStatus {
 }
 
 export class SfxError extends Error {
-  constructor(public status: number, message: string) {
+  // `detail` preserva o corpo estruturado da fábrica (§5). No 422 de
+  // `instruct` inválido é um objeto {erro,tokens_invalidos,validos,exemplo}
+  // — a UI usa `validos` p/ dropdowns e `tokens_invalidos` p/ marcar erro.
+  constructor(
+    public status: number,
+    message: string,
+    public detail?: unknown,
+  ) {
     super(message);
   }
+}
+
+// Mensagem legível a partir do `detail` da fábrica (string OU objeto §4.5).
+function readableDetail(detail: unknown, status: number): string {
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (detail && typeof detail === 'object') {
+    const erro = (detail as Record<string, unknown>)['erro'];
+    if (typeof erro === 'string' && erro.trim()) return erro;
+  }
+  return `erro ${status}`;
 }
 
 // Lock global: GPU processa 1 job por vez. Recusa rápido se ocupado (o front
@@ -111,15 +128,18 @@ export async function sfxGenerate(
     }
     if (r.status !== 200) {
       const ct = r.headers.get('content-type') ?? '';
-      let detail = `erro ${r.status}`;
+      let detail: unknown = `erro ${r.status}`;
       try {
         detail = ct.includes('json')
-          ? String(((await r.json()) as { detail?: unknown }).detail ?? detail)
+          ? (((await r.json()) as { detail?: unknown }).detail ?? detail)
           : (await r.text()).slice(0, 300);
       } catch {
         /* mantém detail genérico */
       }
-      throw new SfxError(r.status, detail);
+      // Preserva o objeto estruturado (422 de instruct) p/ a UI; string vai
+      // só na mensagem.
+      const structured = detail && typeof detail === 'object' ? detail : undefined;
+      throw new SfxError(r.status, readableDetail(detail, r.status), structured);
     }
     const bytes = Buffer.from(await r.arrayBuffer());
     return { bytes, promptEn: r.headers.get('X-Prompt-EN') || null };

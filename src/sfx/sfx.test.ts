@@ -58,6 +58,26 @@ describe('sfx gateway — geração: erros + lock', () => {
     vi.stubGlobal('fetch', vi.fn(async () => res(503, { detail: 'GPU ocupada' }, { 'content-type': 'application/json' })));
     await expect(gw.sfxGenerate('sfx', { prompt: 'x' })).rejects.toMatchObject({ status: 503, message: 'GPU ocupada' });
   });
+  it('422 estruturado (instruct inválido) preserva o objeto detail (§4.5)', async () => {
+    const detailObj = {
+      erro: 'instruct inválido',
+      tokens_invalidos: ['banana'],
+      validos: { gender: ['male', 'female'], age: [], accent: [], pitch: [], style: ['whisper'] },
+      exemplo: 'female, young adult, portuguese accent',
+    };
+    vi.stubGlobal('fetch', vi.fn(async () => res(422, { detail: detailObj }, { 'content-type': 'application/json' })));
+    const err = await gw.sfxGenerate('vocal', { text: 'oi', instruct: 'banana' }).catch((e) => e);
+    expect(err.status).toBe(422);
+    expect(err.message).toBe('instruct inválido'); // detail.erro vira a message
+    expect(err.detail).toEqual(detailObj); // objeto preservado p/ a UI montar dropdowns
+  });
+  it('detail string → message = string, sem detail estruturado', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => res(404, { detail: 'Preset não encontrado' }, { 'content-type': 'application/json' })));
+    const err = await gw.sfxGenerate('bed', { name: 'x' }).catch((e) => e);
+    expect(err.status).toBe(404);
+    expect(err.message).toBe('Preset não encontrado');
+    expect(err.detail).toBeUndefined();
+  });
   it('200 → bytes + X-Prompt-EN', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => res(200, 'MP3DATA', { 'x-prompt-en': 'broken glass' })));
     const r = await gw.sfxGenerate('sfx', { prompt: 'vidro', lang: 'pt' });
