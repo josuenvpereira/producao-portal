@@ -86,6 +86,8 @@ Fonte da verdade = **`scripts/generate_org_manifest.js`** (roster-driven, de
 
 ```bash
 npm install && npm run typecheck && npm test            # backend (30 testes hoje)
+npx vitest run src/auth/key.test.ts                     # 1 arquivo de teste
+npx vitest run -t "<substring do nome>"                 # 1 teste por nome
 npm --prefix web install && npm --prefix web run build  # SPA (tsc + vite)
 node scripts/gen-portal-key.js        # chave + hash → .env (PORTAL_ACCESS_KEY_HASH)
 cp .env.example .env                  # preencher
