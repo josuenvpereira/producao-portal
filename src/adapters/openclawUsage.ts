@@ -68,6 +68,16 @@ export async function fetchOpenClawUsage(
   if (!cfg.usageUrl) {
     return { data: [], degraded: true, notes: ['OPENCLAW_USAGE_URL ausente'] };
   }
+  // Gate: /usage é autenticado e, sem token, responde HTML (formato a definir).
+  // Sem token o fetch é garantidamente inútil — pulamos os 8s a cada indexação
+  // até OPENCLAW_USAGE_TOKEN ser configurado (e o formato real, conhecido).
+  if (!cfg.token) {
+    return {
+      data: [],
+      degraded: true,
+      notes: ['OpenClaw /usage desabilitado: defina OPENCLAW_USAGE_TOKEN (fetch pulado)'],
+    };
+  }
   const reqHeaders: Record<string, string> = {
     Accept: 'application/json',
     'User-Agent': 'msu-producao-portal',
