@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, ApiError } from '../api';
+import { api, ApiError, asInstructError } from '../api';
 import type { SfxStatus, SfxCatalog, SfxMeta } from '../api';
 import { useApi } from '../hooks';
 import { Loading, fmtDate } from '../components';
@@ -51,7 +51,49 @@ function fileToB64(file: File): Promise<string> {
 }
 const MAX_REF_BYTES = 12 * 1024 * 1024; // §4.5: ~12MB de áudio bruto
 
-function InstructPicker({ sel, onChange }: { sel: InstructSel; onChange: (s: InstructSel) => void }) {
+// Erro da fábrica → mensagem clara (PORTAL_HANDOFF §5). A `message` já vem
+// propagada do gateway; aqui damos contexto por status.
+function friendlyError(e: ApiError): string {
+  const m = (e.message || '').trim();
+  switch (e.status) {
+    case 401:
+      return 'Falha de autenticação na fábrica (configuração do portal).';
+    case 404:
+      return `${m || 'Preset não encontrado'} — recarregue a página p/ atualizar o catálogo.`;
+    case 409:
+      return m || 'Uma geração já está em andamento (GPU serializada). Aguarde terminar.';
+    case 422:
+      return m || 'Dados inválidos no formulário.';
+    case 502:
+      return `Gerador indisponível agora (backend caído). ${m}`.trim();
+    case 503:
+      return /offline|deslig|túnel|tunel/i.test(m)
+        ? m
+        : `Serviço ocupado ou sem chave: ${m || 'tente em instantes'}.`;
+    case 504:
+      return 'Demorou demais; tente de novo.';
+    default:
+      return m || `Erro ${e.status}.`;
+  }
+}
+
+// Deriva o modo do vocal a partir do req salvo (a fábrica não guarda isso).
+function vocalModeOf(r: Record<string, unknown>): string {
+  if (Array.isArray(r['speakers'])) return 'multi';
+  if (r['ref_audio_b64']) return 'clone';
+  if (r['instruct']) return 'design';
+  return 'tts';
+}
+
+function InstructPicker({
+  sel,
+  onChange,
+  vocab = INSTRUCT_VOCAB,
+}: {
+  sel: InstructSel;
+  onChange: (s: InstructSel) => void;
+  vocab?: Record<keyof InstructSel, string[]>;
+}) {
   return (
     <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
       {SEL_KEYS.map((k) => (
@@ -64,7 +106,7 @@ function InstructPicker({ sel, onChange }: { sel: InstructSel; onChange: (s: Ins
             onChange={(e) => onChange({ ...sel, [k]: e.target.value })}
           >
             <option value="">— qualquer —</option>
-            {INSTRUCT_VOCAB[k].map((v) => (
+            {(vocab[k] ?? []).map((v) => (
               <option key={v} value={v}>{v}</option>
             ))}
           </select>
@@ -104,6 +146,11 @@ export function Sfx() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [result, setResult] = useState<{ url: string; promptEn: string | null } | null>(null);
+  // override do vocabulário de instruct vindo do 422 estruturado (§4.5):
+  // `validos` repovoa os dropdowns; `tokens_invalidos` marca o que a fábrica
+  // recusou. Limpos ao trocar de modo.
+  const [vocab, setVocab] = useState<Record<keyof InstructSel, string[]> | null>(null);
+  const [badTok, setBadTok] = useState<string[]>([]);
 
   // form state (defaults do §4 / §4.5)
   const [sfxF, setSfxF] = useState({ prompt: '', lang: 'pt', duration: 5, steps: 150, seed: '' });
@@ -236,15 +283,22 @@ export function Sfx() {
       else body = vocalBody();
       const r = await api.sfxGenerate(kind, body);
       setResult({ url: r.url, promptEn: r.promptEn });
+      setBadTok([]);
       reloadLib();
       reloadStatus();
     } catch (e) {
       if (e instanceof ApiError) {
-        const ex =
-          e.detail && typeof e.detail === 'object' && 'exemplo' in e.detail
-            ? ` (ex.: ${String((e.detail as { exemplo?: unknown }).exemplo ?? '')})`
-            : '';
-        setErr(e.message + ex);
+        const ie = asInstructError(e.detail);
+        if (ie) {
+          setVocab(ie.validos);
+          setBadTok(ie.tokens_invalidos);
+          setErr(
+            `Voz inválida: ${ie.tokens_invalidos.join(', ') || '—'}. ` +
+              `Ajuste os campos (ex.: ${ie.exemplo}).`,
+          );
+        } else {
+          setErr(friendlyError(e));
+        }
       } else setErr('Falha na geração.');
     } finally {
       setBusy(false);
@@ -338,7 +392,7 @@ export function Sfx() {
               <div className="seg">
                 {VMODES.map(([m, label]) => (
                   <button key={m} className={vmode === m ? 'on' : ''}
-                    onClick={() => { setVmode(m); setErr(''); }}>{label}</button>
+                    onClick={() => { setVmode(m); setErr(''); setBadTok([]); setVocab(null); }}>{label}</button>
                 ))}
               </div>
 
@@ -353,7 +407,13 @@ export function Sfx() {
                   <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
                     voz (deixe “— qualquer —” p/ usar o padrão da fábrica)
                   </div>
-                  <InstructPicker sel={vsel} onChange={setVsel} />
+                  <InstructPicker sel={vsel} onChange={setVsel} vocab={vocab ?? INSTRUCT_VOCAB} />
+                  {badTok.length > 0 && (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                      recusado pela fábrica: <b>{badTok.join(', ')}</b> — dropdowns
+                      atualizados com os valores aceitos.
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -451,8 +511,17 @@ export function Sfx() {
           {err && <div className="banner" style={{ marginTop: 12 }}>{err}</div>}
 
           {result && !err && (
-            <div className="muted" style={{ marginTop: 12, fontSize: 13 }}>
-              ✓ Áudio gerado — disponível na <b>Biblioteca</b> ao lado (tocar e baixar por lá).
+            <div style={{ marginTop: 14 }}>
+              <audio controls src={result.url} style={{ width: '100%' }} />
+              <div className="row" style={{ marginTop: 8, justifyContent: 'space-between', alignItems: 'center' }}>
+                <a className="btn" href={result.url} download={`${kind}.mp3`}>baixar</a>
+                <span className="muted" style={{ fontSize: 12 }}>salvo na Biblioteca →</span>
+              </div>
+              {result.promptEn && (
+                <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+                  gerado a partir de (EN): <i>{result.promptEn}</i>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -467,12 +536,16 @@ export function Sfx() {
                 {library.map((m: SfxMeta) => {
                   const r = m.req as Record<string, unknown>;
                   const desc = String(r['prompt'] ?? r['name'] ?? r['text'] ?? '—');
+                  const tipo = m.kind === 'vocal' ? `vocal · ${vocalModeOf(r)}` : m.kind;
                   return (
                     <tr key={m.id}>
                       <td className="muted">{fmtDate(new Date(m.ts).toISOString())}</td>
-                      <td>{m.kind}</td>
+                      <td>{tipo}</td>
                       <td className="muted" style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{desc}</td>
-                      <td><audio controls preload="none" src={api.sfxAudioUrl(m.id)} style={{ width: 200, height: 32 }} /></td>
+                      <td>
+                        <audio controls preload="none" src={api.sfxAudioUrl(m.id)} style={{ width: 170, height: 32, verticalAlign: 'middle' }} />
+                        <a className="muted" href={api.sfxAudioUrl(m.id)} download={`${m.id}.mp3`} style={{ fontSize: 11, marginLeft: 6 }}>baixar</a>
+                      </td>
                     </tr>
                   );
                 })}
