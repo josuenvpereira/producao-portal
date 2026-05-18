@@ -72,7 +72,7 @@ export function Overview() {
         />
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '1.7fr 1fr', marginTop: 16 }}>
+      <div className="grid split" style={{ gridTemplateColumns: '1.7fr 1fr', marginTop: 16 }}>
         <Panel title="Produção por estado" sub="episódios na máquina de estados">
           <Bars data={data.byState.map((s) => ({ label: s.state, value: s.c }))} />
         </Panel>

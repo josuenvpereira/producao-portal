@@ -330,7 +330,7 @@ export function Sfx() {
         </div>
       )}
 
-      <div className="grid" style={{ gridTemplateColumns: '1.1fr 1fr', alignItems: 'start' }}>
+      <div className="grid split" style={{ gridTemplateColumns: '1.1fr 1fr', alignItems: 'start' }}>
         <div className="card pad">
           <div className="seg" style={{ marginBottom: 16 }}>
             {(['sfx', 'bed', 'vocal'] as Kind[]).map((k) => (
