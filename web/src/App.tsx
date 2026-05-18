@@ -92,7 +92,7 @@ function Shell() {
             <div className="logo">P</div>
             <div>
               <b>Produção</b>
-              <small>My Storage Units</small>
+              <small>Jotaene Serviços</small>
             </div>
           </div>
 

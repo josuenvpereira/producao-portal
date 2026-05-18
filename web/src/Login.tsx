@@ -28,7 +28,7 @@ export function Login({ onOk }: { onOk: () => void }) {
   return (
     <div className="login">
       <form onSubmit={submit}>
-        <h1>Produção · My Storage Units</h1>
+        <h1>Produção · Jotaene Serviços</h1>
         <p>Acesso restrito. Informe a chave única.</p>
         <input
           type="password"

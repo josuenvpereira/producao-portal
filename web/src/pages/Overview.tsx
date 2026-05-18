@@ -36,7 +36,7 @@ export function Overview() {
       <div className="page-head">
         <div>
           <h1>Bem-vindo de volta</h1>
-          <div className="sub">Visão geral da produção · My Storage Units</div>
+          <div className="sub">Visão geral da produção · Jotaene Serviços</div>
         </div>
         <div className="row">
           <span className="chip">Atualizado: {fmtDate(data.lastSync)}</span>
