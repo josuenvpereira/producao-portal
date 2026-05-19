@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
+import ReactFlow, { Background, Controls, MiniMap, Handle, Position } from 'reactflow';
 import type { Node, Edge, NodeProps, NodeTypes } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { api } from '../api';
@@ -31,6 +31,8 @@ function short(role: string): string {
 function PhaseNode({ data }: NodeProps<PhaseData>) {
   return (
     <div className="onode" style={{ width: 260 }}>
+      <Handle type="target" position={Position.Left} />
+      <Handle type="source" position={Position.Right} />
       <div className="ohead">
         <div className="oav">{data.emoji}</div>
         <div>
@@ -120,7 +122,7 @@ function build(
         id: `${s}-${t}`,
         source: s,
         target: t,
-        type: 'bezier',
+        type: 'default',
         animated: true,
         style: { stroke: 'var(--c-dev)', strokeWidth: 2 },
       });
@@ -132,7 +134,7 @@ function build(
       id: `entrada-${first}`,
       source: '__entrada__',
       target: first,
-      type: 'bezier',
+      type: 'default',
       style: { stroke: 'var(--border-strong)', strokeDasharray: '4 4' },
     });
   }

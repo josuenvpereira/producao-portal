@@ -4,6 +4,8 @@ import ReactFlow, {
   Background,
   Controls,
   MiniMap,
+  Handle,
+  Position,
   applyNodeChanges,
 } from 'reactflow';
 import type { Node, Edge, NodeChange, NodeProps, NodeTypes } from 'reactflow';
@@ -34,6 +36,8 @@ function CardNode({ data }: NodeProps<NodeData>) {
     data.variant === 'ceo' ? 'lvl-ceo' : data.variant === 'gov' ? 'lvl-gov' : data.variant === 'ops' ? 'lvl-ops' : '';
   return (
     <div className={`onode ${lvl}`}>
+      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Bottom} />
       <div className="ohead">
         <div className="oav">{data.emoji}</div>
         <div>
@@ -63,6 +67,8 @@ function CardNode({ data }: NodeProps<NodeData>) {
 function BandNode({ data }: NodeProps<NodeData>) {
   return (
     <div className="oband" style={{ color: `var(--c-${data.variant === 'ops' ? 'ops' : 'gov'})` }}>
+      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Bottom} />
       {data.name}
       <small>{data.role}</small>
     </div>
@@ -72,6 +78,8 @@ function BandNode({ data }: NodeProps<NodeData>) {
 function AgentNode({ data }: NodeProps<NodeData>) {
   return (
     <div className="onode oagent" onClick={() => data.onOpen?.()} style={{ cursor: 'pointer' }}>
+      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Bottom} />
       <div className="ohead" style={{ padding: 0 }}>
         <div className="oav">{data.emoji}</div>
         <div>
@@ -150,7 +158,7 @@ function buildSquads(org: OrgManifest, ov: Overview | null, navigate: (p: string
         },
       });
       edges.push({
-        id: `ceo-${lead.id}`, source: 'ceo', target: lead.id, type: 'bezier',
+        id: `ceo-${lead.id}`, source: 'ceo', target: lead.id, type: 'default',
         style: { stroke: `var(--c-${color})`, strokeWidth: 2 }, animated: true,
       });
     }
@@ -163,7 +171,7 @@ function buildSquads(org: OrgManifest, ov: Overview | null, navigate: (p: string
     });
     edges.push({
       id: `${lead ? lead.id : 'ceo'}-${bandId}`, source: lead ? lead.id : 'ceo',
-      target: bandId, type: 'bezier', style: { stroke: `var(--c-${color})`, strokeWidth: 2 },
+      target: bandId, type: 'default', style: { stroke: `var(--c-${color})`, strokeWidth: 2 },
     });
 
     // membros — grade 2 colunas
@@ -197,12 +205,12 @@ function buildSquads(org: OrgManifest, ov: Overview | null, navigate: (p: string
       });
       edges.push({
         id: `ceo-${supervisor.id}`, source: 'ceo', target: supervisor.id,
-        type: 'bezier', style: { stroke: 'var(--c-ops)', strokeDasharray: '4 4', opacity: 0.5 },
+        type: 'default', style: { stroke: 'var(--c-ops)', strokeDasharray: '4 4', opacity: 0.5 },
       });
       for (const pid of org.pipeline ?? []) {
         if (members.some((m) => m.id === pid)) {
           edges.push({
-            id: `sup-${pid}`, source: supervisor.id, target: pid, type: 'bezier',
+            id: `sup-${pid}`, source: supervisor.id, target: pid, type: 'default',
             style: { stroke: 'var(--c-ops)', strokeDasharray: '4 4', opacity: 0.45 },
           });
         }
@@ -239,13 +247,13 @@ function buildAgentes(org: OrgManifest, navigate: (p: string) => void) {
     });
     for (const t of a.handsOffTo ?? []) {
       if (all.some((x) => x.id === t)) edges.push({
-        id: `${a.id}-${t}`, source: a.id, target: t, type: 'bezier', animated: true,
+        id: `${a.id}-${t}`, source: a.id, target: t, type: 'default', animated: true,
         style: { stroke: 'var(--c-dev)', strokeWidth: 2 },
       });
     }
     for (const s of a.supervises ?? []) {
       if (all.some((x) => x.id === s)) edges.push({
-        id: `${a.id}~${s}`, source: a.id, target: s, type: 'bezier',
+        id: `${a.id}~${s}`, source: a.id, target: s, type: 'default',
         style: { stroke: 'var(--c-ops)', strokeDasharray: '4 4', opacity: 0.55 },
       });
     }
