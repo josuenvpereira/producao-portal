@@ -101,6 +101,14 @@ export const config = {
   cost: {
     monthlyBudgetUsd: Number(optional('COST_MONTHLY_BUDGET_USD', '30')),
   },
+
+  // Reindex periódico (server.ts/main). Sem isso, episódio em andamento NÃO
+  // aparece na UI (orquestrador escreve em pipeline-state/, mas o read-model
+  // SQLite só atualizaria via webhook GitHub, que não dispara em handoff
+  // local). `runIndexer` é re-entrancy-safe (guard inFlight).
+  reindex: {
+    intervalS: Number(optional('REINDEX_INTERVAL_S', '30')),
+  },
 } as const;
 
 export type Config = typeof config;

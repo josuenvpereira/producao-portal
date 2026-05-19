@@ -15,6 +15,7 @@ import { sfxRoutes } from './routes/sfx.js';
 import { sseRoutes } from './routes/sse.js';
 import { webhookRoutes } from './routes/webhook.js';
 import { spaRoutes } from './routes/spa.js';
+import { runIndexer } from './indexer.js';
 
 export async function buildServer() {
   const app = Fastify({
@@ -120,9 +121,11 @@ async function main(): Promise<void> {
   // CD faz `docker compose up -d --build` → SIGTERM no container. Sem isto o
   // hook onClose (fecha SQLite/WAL) não dispara e o SSE é cortado abrupto.
   // Sem process.exit() explícito: deixa o loop drenar (padrão do indexer.ts).
+  let reindexTimer: NodeJS.Timeout | null = null;
   for (const sig of ['SIGTERM', 'SIGINT'] as const) {
     process.once(sig, () => {
       app.log.info({ sig }, 'sinal recebido — encerrando');
+      if (reindexTimer) clearInterval(reindexTimer);
       void app.close().catch((err) => {
         app.log.error(err, 'erro no shutdown');
         process.exitCode = 1;
@@ -131,6 +134,16 @@ async function main(): Promise<void> {
   }
   try {
     await app.listen({ port: config.port, host: '0.0.0.0' });
+    // Reindex periódico: orquestrador escreve em pipeline-state/ a cada
+    // handoff (não dispara webhook GitHub), então sem este timer o read-model
+    // ficaria congelado e a UI/SSE não veriam o andamento ao vivo.
+    // `runIndexer` é re-entrancy-safe (guard `inFlight`).
+    const tick = (): void => {
+      runIndexer().catch((err) => app.log.error(err, 'reindex periódico falhou'));
+    };
+    tick(); // boot reindex (read-model fresco já no startup)
+    reindexTimer = setInterval(tick, config.reindex.intervalS * 1000);
+    app.log.info({ intervalS: config.reindex.intervalS }, 'reindex periódico iniciado');
   } catch (err) {
     app.log.error(err);
     process.exitCode = 1;
