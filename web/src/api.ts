@@ -216,6 +216,10 @@ export interface EsteiraAgent {
   name: string;
   emoji: string;
   role: string;
+  squadId: string;
+  squadName: string;
+  lead: boolean;
+  handsOffTo: string[];
 }
 export interface EsteiraEpisode {
   episode_id: string;

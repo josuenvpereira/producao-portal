@@ -37,7 +37,7 @@ const SQUADS = [
   {
     id: 'conteudo', name: 'Conteúdo · Mensageria',
     agents: [
-      { id: 'gerente-com', branch: 'gerente-com', emoji: '📋', name: 'Gerente Comunicação', role: 'Gerente · pautas (mensageria/Jotaene)', model: 'deepseek-v4-pro', lead: true },
+      { id: 'gerente-com', branch: 'gerente-com', emoji: '📋', name: 'Gerente Comunicação', role: 'Gerente · pautas (mensageria/Jotaene)', model: 'deepseek-v4-pro', lead: true, handsOffTo: ['analista-com'] },
       { id: 'analista-com', branch: 'analista-com', emoji: '✍️', name: 'Analista Comunicação', role: 'Analista · publica posts (WhatsApp)', model: 'deepseek-v4-flash' },
     ],
   },
@@ -86,7 +86,7 @@ function build() {
       const o = overrides[a.id] || {};
       return {
         ...a,
-        handsOffTo: handsOff(a.id),
+        handsOffTo: a.handsOffTo ?? handsOff(a.id),
         ...o,
       };
     }),

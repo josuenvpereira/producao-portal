@@ -4,21 +4,24 @@ import ReactFlow, { Background, Controls, MiniMap, Handle, Position } from 'reac
 import type { Node, Edge, NodeProps, NodeTypes } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { api } from '../api';
-import type { EsteiraData } from '../api';
+import type { EsteiraData, EsteiraAgent } from '../api';
 import { useApi } from '../hooks';
 import { useRefreshTick } from '../refresh';
 import { StateBadge, Banner, Loading } from '../components';
 
 // Esteira = o pipeline de produção visual (estilo n8n). Fonte 100%
-// data-driven: nós = agentes do org.json `pipeline` (ordem do handoff);
-// cada episódio cai no nó do ÚLTIMO `by_agent` do state_history. Clicar
-// num episódio abre o detalhe (Episode), onde estão os artefatos reais.
+// data-driven: nós = agentes de TODOS os squads do org.json; as arestas
+// vêm do `handsOffTo` de cada agente (gerado em generate_org_manifest.js,
+// nada inferido aqui). Cada episódio cai no nó do ÚLTIMO `by_agent` do
+// state_history. Clicar num episódio abre o detalhe (Episode).
 
 interface EpItem { id: string; title: string; state: string | null; escalated: number }
 interface PhaseData {
   emoji: string;
   name: string;
   role: string;
+  squad: string;
+  lead: boolean;
   eps: EpItem[];
   onOpen: (id: string) => void;
 }
@@ -35,8 +38,11 @@ function PhaseNode({ data }: NodeProps<PhaseData>) {
       <Handle type="source" position={Position.Right} />
       <div className="ohead">
         <div className="oav">{data.emoji}</div>
-        <div>
-          <div className="oname">{data.name}</div>
+        <div style={{ minWidth: 0 }}>
+          <div className="oname">
+            {data.name}
+            {data.lead && <span className="badge b-prog" style={{ marginLeft: 6 }}>lead</span>}
+          </div>
           <div className="orole">{data.role}</div>
         </div>
       </div>
@@ -71,72 +77,146 @@ function PhaseNode({ data }: NodeProps<PhaseData>) {
   );
 }
 
-const NODE_TYPES: NodeTypes = { phase: PhaseNode };
+function SquadLabel({ data }: NodeProps<{ name: string }>) {
+  return <div className="esq-lane-label">{data.name}</div>;
+}
+
+const NODE_TYPES: NodeTypes = { phase: PhaseNode, squad: SquadLabel };
+
+const COL_W = 320;
+const ROW_H = 540;
+
+// Ordena os agentes de um squad pela cadeia de handoff (Kahn). Líderes
+// entram primeiro entre as raízes; ciclos/sobras preservam ordem original.
+function orderSquad(agents: EsteiraAgent[]): EsteiraAgent[] {
+  const ids = new Set(agents.map((a) => a.id));
+  const byId = new Map(agents.map((a) => [a.id, a]));
+  const indeg = new Map<string, number>();
+  agents.forEach((a) => indeg.set(a.id, 0));
+  agents.forEach((a) =>
+    a.handsOffTo.forEach((t) => {
+      if (ids.has(t)) indeg.set(t, (indeg.get(t) ?? 0) + 1);
+    }),
+  );
+  const queue = agents
+    .filter((a) => (indeg.get(a.id) ?? 0) === 0)
+    .sort((a, b) => Number(b.lead) - Number(a.lead));
+  const out: EsteiraAgent[] = [];
+  const seen = new Set<string>();
+  while (queue.length) {
+    const a = queue.shift();
+    if (!a || seen.has(a.id)) continue;
+    seen.add(a.id);
+    out.push(a);
+    for (const t of a.handsOffTo) {
+      if (!ids.has(t) || seen.has(t)) continue;
+      indeg.set(t, (indeg.get(t) ?? 1) - 1);
+      if ((indeg.get(t) ?? 0) <= 0) {
+        const n = byId.get(t);
+        if (n) queue.push(n);
+      }
+    }
+  }
+  for (const a of agents) if (!seen.has(a.id)) out.push(a);
+  return out;
+}
 
 function build(
   d: EsteiraData,
   onOpen: (id: string) => void,
-): { nodes: Node<PhaseData>[]; edges: Edge[] } {
-  const inPipe = new Set(d.pipeline);
+): { nodes: Node[]; edges: Edge[] } {
+  const known = new Set(d.agents.map((a) => a.id));
   const toItem = (e: EsteiraData['episodes'][number]): EpItem => ({
     id: e.episode_id,
     title: e.title || e.episode_id,
     state: e.state,
     escalated: e.escalated,
   });
-  const orphans = d.episodes.filter((e) => !e.last_agent || !inPipe.has(e.last_agent));
-  const nodes: Node<PhaseData>[] = [];
+  const epsOf = (id: string) =>
+    d.episodes.filter((e) => e.last_agent === id).map(toItem);
+  const orphans = d.episodes.filter(
+    (e) => !e.last_agent || !known.has(e.last_agent),
+  );
+
+  // Agrupa por squad preservando a ordem de chegada (Comunicação, depois MSU).
+  const order: string[] = [];
+  const bySquad = new Map<string, { name: string; agents: EsteiraAgent[] }>();
+  for (const a of d.agents) {
+    let g = bySquad.get(a.squadId);
+    if (!g) {
+      g = { name: a.squadName, agents: [] };
+      bySquad.set(a.squadId, g);
+      order.push(a.squadId);
+    }
+    g.agents.push(a);
+  }
+
+  const nodes: Node[] = [];
   const edges: Edge[] = [];
-  let x = 0;
+  let row = 0;
 
   if (orphans.length) {
     nodes.push({
       id: '__entrada__',
       type: 'phase',
       position: { x: 0, y: 0 },
-      data: { emoji: '📥', name: 'Sem fase', role: 'sem handoff registrado', eps: orphans.map(toItem), onOpen },
-    });
-    x = 320;
-  }
-
-  d.agents.forEach((a, i) => {
-    nodes.push({
-      id: a.id,
-      type: 'phase',
-      position: { x: x + i * 320, y: 0 },
       data: {
-        emoji: a.emoji,
-        name: a.name,
-        role: short(a.role),
-        eps: d.episodes.filter((e) => e.last_agent === a.id).map(toItem),
+        emoji: '📥',
+        name: 'Sem fase',
+        role: 'sem handoff registrado',
+        squad: '',
+        lead: false,
+        eps: orphans.map(toItem),
         onOpen,
       },
     });
-  });
+    row = 1;
+  }
 
-  for (let i = 0; i < d.pipeline.length - 1; i++) {
-    const s = d.pipeline[i];
-    const t = d.pipeline[i + 1];
-    if (s && t) {
+  for (const sid of order) {
+    const g = bySquad.get(sid);
+    if (!g) continue;
+    const y = row * ROW_H;
+    nodes.push({
+      id: `__lane_${sid}`,
+      type: 'squad',
+      position: { x: -220, y: y + 8 },
+      data: { name: g.name },
+      draggable: false,
+      selectable: false,
+    });
+    orderSquad(g.agents).forEach((a, col) => {
+      nodes.push({
+        id: a.id,
+        type: 'phase',
+        position: { x: col * COL_W, y },
+        data: {
+          emoji: a.emoji,
+          name: a.name,
+          role: short(a.role),
+          squad: g.name,
+          lead: a.lead,
+          eps: epsOf(a.id),
+          onOpen,
+        },
+      });
+    });
+    row += 1;
+  }
+
+  // Arestas = handsOffTo de cada agente (n8n look). Nada inferido.
+  for (const a of d.agents) {
+    for (const t of a.handsOffTo) {
+      if (!known.has(t)) continue;
       edges.push({
-        id: `${s}-${t}`,
-        source: s,
+        id: `${a.id}-${t}`,
+        source: a.id,
         target: t,
-        type: 'default',
+        type: 'smoothstep',
         animated: true,
         style: { stroke: 'var(--c-dev)', strokeWidth: 2 },
       });
     }
-  }
-  const first = d.pipeline[0];
-  if (orphans.length && first) {
-    edges.push({
-      id: `entrada-${first}`,
-      source: '__entrada__',
-      target: first,
-      type: 'default',
-      style: { stroke: 'var(--border-strong)', strokeDasharray: '4 4' },
-    });
   }
   return { nodes, edges };
 }
@@ -183,9 +263,9 @@ export function Esteira() {
         </ReactFlow>
       </div>
       <div className="muted" style={{ marginTop: 10, fontSize: 12 }}>
-        Nós = agentes do pipeline (org.json) · episódio posicionado pelo último
-        handoff (state_history) · clique num episódio → detalhe + artefatos
-        (read-only, não dispara agente).
+        Nós = agentes de todos os squads (org.json) · arestas = handoff real
+        (handsOffTo) · episódio posicionado pelo último handoff (state_history)
+        · clique num episódio → detalhe + artefatos (read-only).
       </div>
     </>
   );

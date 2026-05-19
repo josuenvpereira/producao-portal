@@ -229,30 +229,38 @@ export function assetsList(db: Db) {
   return { assets: rows, degraded: degradedNotes(db) };
 }
 
-// Esteira visual: o fluxo de fases vem do org.json (`pipeline` = agentes na
-// ordem do handoff); cada episódio é posicionado pelo ÚLTIMO `by_agent` do
-// state_history (dado real, sem inferir estado→fase).
+// Esteira visual: o fluxo n8n vem do org.json — TODOS os squads (Comunicação
+// + Canal MSU), com as arestas de handoff em `handsOffTo` (gerador). Cada
+// episódio é posicionado pelo ÚLTIMO `by_agent` do state_history (dado real,
+// sem inferir estado→fase).
 export function esteira(db: Db) {
   const org = orgManifest() as {
     pipeline?: string[];
     squads?: Array<{
-      agents?: Array<{ id: string; name?: string; emoji?: string; role?: string }>;
+      id?: string;
+      name?: string;
+      agents?: Array<{
+        id: string;
+        name?: string;
+        emoji?: string;
+        role?: string;
+        lead?: boolean;
+        handsOffTo?: string[];
+      }>;
     }>;
   };
   const pipeline = Array.isArray(org.pipeline) ? org.pipeline : [];
-  const byId = new Map<string, { id: string; name: string; emoji: string; role: string }>();
-  for (const sq of org.squads ?? []) {
-    for (const a of sq.agents ?? []) {
-      byId.set(a.id, {
-        id: a.id,
-        name: a.name ?? a.id,
-        emoji: a.emoji ?? '•',
-        role: a.role ?? '',
-      });
-    }
-  }
-  const agents = pipeline.map(
-    (id) => byId.get(id) ?? { id, name: id, emoji: '•', role: '' },
+  const agents = (org.squads ?? []).flatMap((sq) =>
+    (sq.agents ?? []).map((a) => ({
+      id: a.id,
+      name: a.name ?? a.id,
+      emoji: a.emoji ?? '•',
+      role: a.role ?? '',
+      squadId: sq.id ?? '',
+      squadName: sq.name ?? '',
+      lead: !!a.lead,
+      handsOffTo: Array.isArray(a.handsOffTo) ? a.handsOffTo : [],
+    })),
   );
   const episodes = db
     .prepare(

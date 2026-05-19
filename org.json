@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-05-18T18:22:41.503Z",
+  "generatedAt": "2026-05-19T15:29:33.932Z",
   "project": "Jotaene Serviços",
   "ceo": {
     "id": "main",
@@ -52,7 +52,9 @@
           "role": "Gerente · pautas (mensageria/Jotaene)",
           "model": "deepseek-v4-pro",
           "lead": true,
-          "handsOffTo": []
+          "handsOffTo": [
+            "analista-com"
+          ]
         },
         {
           "id": "analista-com",
