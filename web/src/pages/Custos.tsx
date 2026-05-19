@@ -38,7 +38,7 @@ export function Custos() {
       </div>
 
       <div className="grid" style={{ gap: 16, marginTop: 16 }}>
-        <Panel flush title="Estimativa de TTS por episódio" sub="spokenText × $0.30/1k chars (igual generate_episode_audio.js)">
+        <Panel flush title="Estimativa de TTS por episódio" sub={'spokenText × $0.30/1k chars (igual generate_episode_audio.js) · "Aprovado (sinal)" = gate _COST_APPROVAL_ (pipeline-state, só no VPS); "—" = sem sinal ainda, não é erro'}>
           <table className="tbl">
             <thead><tr><th>Episódio</th><th>Chars</th><th>Custo est.</th><th>Aprovado (sinal)</th><th>Teto</th></tr></thead>
             <tbody>
