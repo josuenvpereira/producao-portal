@@ -264,6 +264,7 @@ export function Organograma() {
   const { data: ov } = useApi(() => api.overview(), []);
   const [view, setView] = useState<View>('squads');
   const [squadFilter, setSquadFilter] = useState('all');
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const base = useMemo(() => {
     if (!org) return { nodes: [] as Node<NodeData>[], edges: [] as Edge[] };
@@ -323,7 +324,9 @@ export function Organograma() {
       </div>
 
       <div className="orgwrap">
+        {panelOpen ? (
         <div className="opanel">
+          <button className="opanel-x" title="Esconder painel" onClick={() => setPanelOpen(false)}>✕</button>
           <h2>Organograma</h2>
           <div className="ph">Arraste nós para reorganizar</div>
 
@@ -354,6 +357,11 @@ export function Organograma() {
             <div><i style={{ background: 'var(--c-dev)' }} /> Agentes da pipeline</div>
           </div>
         </div>
+        ) : (
+          <button className="opanel-toggle" title="Mostrar painel/legenda" onClick={() => setPanelOpen(true)}>
+            ☰ Painel
+          </button>
+        )}
 
         <ReactFlow
           nodes={nodes}
