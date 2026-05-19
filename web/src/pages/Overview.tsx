@@ -8,6 +8,7 @@ import { Kpi, MiniBars, Bars, Panel, StateBadge, Banner, Loading, fmtUsd, fmtDat
 export function Overview() {
   const tick = useRefreshTick();
   const { data, error } = useApi(() => api.overview(), [tick]);
+  const { data: cost } = useApi(() => api.cost(), [tick]);
   const [q, setQ] = useState('');
   if (!data) return <Loading error={error} />;
   const k = data.kpis;
@@ -80,6 +81,18 @@ export function Overview() {
           <Bars data={agentBars} />
         </Panel>
       </div>
+
+      {cost && (
+        <>
+          <div className="section-title">Custo por mês</div>
+          <Panel
+            title="Custo de cron por mês"
+            sub={`estimado · TTS ${fmtUsd(cost.totals.ttsEstimateUsd)} + agentes ${fmtUsd(cost.totals.openclawUsd)} · teto ${fmtUsd(cost.totals.monthlyBudgetUsd)} (timeline só de crons — agent_usage não tem tempo)`}
+          >
+            <Bars data={[...cost.cronTimeline.byMonth].reverse().map((x) => ({ label: x.m, value: x.cost }))} />
+          </Panel>
+        </>
+      )}
 
       <div className="section-title">Atividade recente — handoffs agente → agente</div>
       <div className="card">
