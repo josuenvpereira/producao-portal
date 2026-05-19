@@ -1,12 +1,12 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, isAbsolute } from 'node:path';
 
-// Carrega .env (sem dependência: parser mínimo) antes de ler process.env.
-// Em prod o .env vem do VPS (docker compose env_file), igual ao OpenClaw.
-function loadDotenv(): void {
-  const envPath = resolve(process.cwd(), '.env');
-  if (!existsSync(envPath)) return;
-  for (const raw of readFileSync(envPath, 'utf8').split('\n')) {
+// Carrega env de arquivo (sem dependência: parser mínimo) antes de ler
+// process.env. Em prod o .env vem do VPS (docker compose env_file), igual ao
+// OpenClaw — `loadDotenv` vira no-op (vars já em process.env).
+function loadEnvFile(p: string): void {
+  if (!existsSync(p)) return;
+  for (const raw of readFileSync(p, 'utf8').split('\n')) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
     const eq = line.indexOf('=');
@@ -15,6 +15,15 @@ function loadDotenv(): void {
     const v = line.slice(eq + 1).trim();
     if (!(k in process.env)) process.env[k] = v;
   }
+}
+// Dev usa um arquivo PRÓPRIO (`ENV_FILE`, ex.: `.env.development`) p/ NUNCA
+// tocar/poluir o `.env` de produção; `.env.local` (gitignored) sobrepõe sem
+// editar nada versionado. Precedência: process.env > .env.local > $ENV_FILE
+// (default `.env`). Produção: ENV_FILE não setado + sem .env.local → idêntico.
+function loadDotenv(): void {
+  const cwd = process.cwd();
+  loadEnvFile(resolve(cwd, '.env.local'));
+  loadEnvFile(resolve(cwd, process.env['ENV_FILE'] ?? '.env'));
 }
 loadDotenv();
 
