@@ -113,10 +113,10 @@ function Shell() {
 
           <div className="spacer" />
           <div className="usercard">
-            <div className="av">O</div>
+            <div className="av">A</div>
             <div>
-              <b style={{ fontSize: 13 }}>Operador</b>
-              <small>Squad MSU</small>
+              <b style={{ fontSize: 13 }}>Admin</b>
+              <small>Operação</small>
             </div>
             <button
               className="lo"
