@@ -7,6 +7,10 @@ import {
   audioPath,
   deleteGeneration,
   setExported,
+  createProfile,
+  listProfiles,
+  profileAudioPath,
+  deleteProfile,
 } from '../sfx/library.js';
 
 const sfxAssetRel = (id: string): string => `sfx-library/${id}.mp3`;
@@ -154,6 +158,76 @@ export async function sfxRoutes(app: FastifyInstance): Promise<void> {
         app.db.prepare('DELETE FROM assets WHERE rel_path=?').run(rel);
       }
       return { ok: true, exported: req.body.exported };
+    },
+  );
+
+  // ── Perfis de voz (a partir de gerações vocais bem-sucedidas) ────────────
+
+  app.get('/api/sfx/profiles', async () => listProfiles());
+
+  app.post(
+    '/api/sfx/profiles',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['fromLibraryId', 'name'],
+          properties: {
+            fromLibraryId: { type: 'string', maxLength: 64 },
+            name: { type: 'string', minLength: 1, maxLength: 64 },
+            refText: { type: 'string', maxLength: 4000 },
+          },
+        },
+      },
+    },
+    async (
+      req: FastifyRequest<{
+        Body: { fromLibraryId: string; name: string; refText?: string };
+      }>,
+      reply,
+    ) => {
+      const r = createProfile(req.body.fromLibraryId, req.body.name, req.body.refText);
+      if ('error' in r) return reply.code(400).send({ error: r.error });
+      return r;
+    },
+  );
+
+  app.delete(
+    '/api/sfx/profiles/:pid',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['pid'],
+          properties: { pid: { type: 'string', maxLength: 64 } },
+        },
+      },
+    },
+    async (req: FastifyRequest<{ Params: { pid: string } }>, reply) => {
+      if (!deleteProfile(req.params.pid)) {
+        return reply.code(404).send({ error: 'perfil não encontrado' });
+      }
+      return { ok: true };
+    },
+  );
+
+  app.get(
+    '/api/sfx/profiles/:pid/audio',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['pid'],
+          properties: { pid: { type: 'string', maxLength: 64 } },
+        },
+      },
+    },
+    async (req: FastifyRequest<{ Params: { pid: string } }>, reply) => {
+      const p = profileAudioPath(req.params.pid);
+      if (!p) return reply.code(404).send({ error: 'áudio do perfil não encontrado' });
+      reply.header('Content-Type', 'audio/mpeg');
+      reply.header('Cache-Control', 'private, max-age=86400');
+      return reply.send(createReadStream(p));
     },
   );
 }

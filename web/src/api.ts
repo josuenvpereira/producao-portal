@@ -65,6 +65,15 @@ export const api = {
       `/sfx/library/${encodeURIComponent(id)}/export`,
       { method: 'POST', body: JSON.stringify({ exported }) },
     ),
+  sfxProfiles: () => req<SfxProfile[]>('/sfx/profiles'),
+  sfxProfileCreate: (fromLibraryId: string, name: string, refText?: string) =>
+    req<SfxProfile>('/sfx/profiles', {
+      method: 'POST',
+      body: JSON.stringify({ fromLibraryId, name, ...(refText ? { refText } : {}) }),
+    }),
+  sfxProfileDelete: (pid: string) =>
+    req<{ ok: true }>(`/sfx/profiles/${encodeURIComponent(pid)}`, { method: 'DELETE' }),
+  sfxProfileAudioUrl: (pid: string) => `/api/sfx/profiles/${encodeURIComponent(pid)}/audio`,
   async sfxGenerate(
     kind: 'sfx' | 'bed' | 'vocal',
     body: Record<string, unknown>,
@@ -257,6 +266,17 @@ export interface SfxMeta {
   ts: number;
   bytes: number;
   exported?: boolean;
+}
+export interface SfxProfile {
+  id: string;
+  name: string;
+  fromLibraryId: string;
+  kind: 'vocal';
+  sourceText: string;
+  refText: string;
+  language: string | null;
+  createdAt: number;
+  audioBytes: number;
 }
 export interface OrgAgent {
   id: string;

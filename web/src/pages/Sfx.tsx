@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, asInstructError } from '../api';
-import type { SfxStatus, SfxCatalog, SfxMeta } from '../api';
+import type { SfxStatus, SfxCatalog, SfxMeta, SfxProfile } from '../api';
 import { useApi } from '../hooks';
 import { Loading, fmtDate } from '../components';
 
@@ -38,15 +38,18 @@ function buildInstruct(sel: InstructSel): string {
 // Lê um File como base64 puro (sem o prefixo data:...;base64,). Transporte
 // do Voice Clone / Multi-Speaker conforme §4.5 (base64 no JSON).
 function fileToB64(file: File): Promise<string> {
+  return blobToB64(file);
+}
+function blobToB64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
-    r.onerror = () => reject(new Error('falha ao ler o arquivo'));
+    r.onerror = () => reject(new Error('falha ao ler o áudio'));
     r.onload = () => {
       const s = String(r.result);
       const i = s.indexOf(',');
       resolve(i >= 0 ? s.slice(i + 1) : s);
     };
-    r.readAsDataURL(file);
+    r.readAsDataURL(blob);
   });
 }
 const MAX_REF_BYTES = 12 * 1024 * 1024; // §4.5: ~12MB de áudio bruto
@@ -140,12 +143,13 @@ export function Sfx() {
   const { data: status, reload: reloadStatus } = useApi(() => api.sfxStatus(), []);
   const { data: catalog } = useApi(() => api.sfxCatalog().catch(() => ({}) as SfxCatalog), []);
   const { data: library, reload: reloadLib } = useApi(() => api.sfxLibrary(), []);
+  const { data: profiles, reload: reloadProfiles } = useApi(() => api.sfxProfiles(), []);
 
   const [kind, setKind] = useState<Kind>('sfx');
   const [vmode, setVmode] = useState<VMode>('tts');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [result, setResult] = useState<{ url: string; promptEn: string | null } | null>(null);
+  const [result, setResult] = useState<{ url: string; id: string | null; promptEn: string | null } | null>(null);
   // override do vocabulário de instruct vindo do 422 estruturado (§4.5):
   // `validos` repovoa os dropdowns; `tokens_invalidos` marca o que a fábrica
   // recusou. Limpos ao trocar de modo.
@@ -282,7 +286,7 @@ export function Sfx() {
         };
       else body = vocalBody();
       const r = await api.sfxGenerate(kind, body);
-      setResult({ url: r.url, promptEn: r.promptEn });
+      setResult({ url: r.url, id: r.id, promptEn: r.promptEn });
       setBadTok([]);
       reloadLib();
       reloadStatus();
@@ -321,6 +325,48 @@ export function Sfx() {
       reloadLib();
     } catch {
       setErr(exported ? 'Falha ao exportar p/ Assets.' : 'Falha ao remover de Assets.');
+    }
+  }
+
+  async function saveAsProfile(libraryId: string, suggested: string) {
+    const name = window.prompt('Nome do perfil de voz:', suggested.slice(0, 40).trim());
+    if (!name || !name.trim()) return;
+    try {
+      await api.sfxProfileCreate(libraryId, name.trim());
+      reloadProfiles();
+    } catch (e) {
+      setErr(e instanceof ApiError ? friendlyError(e) : 'Falha ao salvar o perfil.');
+    }
+  }
+
+  async function delProfile(pid: string) {
+    if (!window.confirm('Apagar este perfil? O áudio fica salvo na Biblioteca.')) return;
+    try {
+      await api.sfxProfileDelete(pid);
+      reloadProfiles();
+    } catch {
+      setErr('Falha ao apagar o perfil.');
+    }
+  }
+
+  // Aplicar perfil = entra em Voice Clone com o áudio salvo + transcrição
+  // exata como ref_text. User só digita o NOVO texto e gera com a MESMA voz.
+  async function applyProfile(p: SfxProfile) {
+    setErr('');
+    setBadTok([]);
+    setVocab(null);
+    try {
+      const r = await fetch(api.sfxProfileAudioUrl(p.id), { credentials: 'include' });
+      if (!r.ok) throw new Error('audio');
+      const b64 = await blobToB64(await r.blob());
+      setKind('vocal');
+      setVmode('clone');
+      setVref({ b64, name: `${p.name}.mp3` });
+      setVrefText(p.refText);
+      setVrefTextOn(true);
+      if (p.language) setVlang(p.language);
+    } catch {
+      setErr('Falha ao carregar o áudio do perfil.');
     }
   }
 
@@ -533,7 +579,16 @@ export function Sfx() {
             <div style={{ marginTop: 14 }}>
               <audio controls src={result.url} style={{ width: '100%' }} />
               <div className="row" style={{ marginTop: 8, justifyContent: 'space-between', alignItems: 'center' }}>
-                <a className="btn" href={result.url} download={`${kind}.mp3`}>baixar</a>
+                <div className="row" style={{ gap: 8 }}>
+                  <a className="btn" href={result.url} download={`${kind}.mp3`}>baixar</a>
+                  {kind === 'vocal' && result.id && (
+                    <button className="btn" type="button"
+                      title="Salvar este áudio + transcrição como perfil reutilizável (Voice Clone)"
+                      onClick={() => saveAsProfile(result.id!, vtext)}>
+                      ★ Salvar perfil
+                    </button>
+                  )}
+                </div>
                 <span className="muted" style={{ fontSize: 12 }}>salvo na Biblioteca →</span>
               </div>
               {result.promptEn && (
@@ -545,6 +600,50 @@ export function Sfx() {
           )}
         </div>
 
+        <div className="grid" style={{ gap: 12 }}>
+        <div className="card" style={{ padding: 0 }}>
+          <div className="panel-head">
+            <h3 style={{ fontSize: 13 }}>Perfis de voz</h3>
+            <span className="muted" style={{ fontSize: 11 }}>{profiles?.length ?? 0} salvo(s)</span>
+          </div>
+          {!profiles ? <Loading /> : (
+            <table className="tbl">
+              <thead><tr><th>Nome</th><th>Transcrição</th><th>Voz</th><th>Ações</th></tr></thead>
+              <tbody>
+                {profiles.length === 0 && (
+                  <tr><td colSpan={4} className="muted">
+                    sem perfis ainda — gere um vocal e clique <b>★ Salvar perfil</b> p/ reusar a voz
+                  </td></tr>
+                )}
+                {profiles.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <b>{p.name}</b>
+                      <div className="muted" style={{ fontSize: 11 }}>
+                        {fmtDate(new Date(p.createdAt).toISOString())}
+                        {p.language ? ` · ${p.language}` : ''}
+                      </div>
+                    </td>
+                    <td className="muted" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.sourceText}>
+                      {p.sourceText}
+                    </td>
+                    <td>
+                      <audio controls preload="none" src={api.sfxProfileAudioUrl(p.id)} style={{ width: 150, height: 32, verticalAlign: 'middle' }} />
+                    </td>
+                    <td>
+                      <button className="muted" onClick={() => applyProfile(p)}
+                        title="Usar este perfil (vai p/ Voice Clone com o áudio salvo)"
+                        style={{ fontSize: 11 }}>↪ usar</button>
+                      <button className="muted" onClick={() => delProfile(p.id)}
+                        title="Apagar perfil"
+                        style={{ fontSize: 11, marginLeft: 8, color: 'var(--danger)' }}>apagar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
         <div className="card" style={{ padding: 0 }}>
           <div className="panel-head"><h3 style={{ fontSize: 13 }}>Biblioteca</h3></div>
           {!library ? <Loading /> : (
@@ -564,6 +663,11 @@ export function Sfx() {
                       <td>
                         <audio controls preload="none" src={api.sfxAudioUrl(m.id)} style={{ width: 170, height: 32, verticalAlign: 'middle' }} />
                         <a className="muted" href={api.sfxAudioUrl(m.id)} download={`${m.id}.mp3`} style={{ fontSize: 11, marginLeft: 6 }}>baixar</a>
+                        {m.kind === 'vocal' && (
+                          <button className="muted" onClick={() => saveAsProfile(m.id, String(r['text'] ?? ''))}
+                            title="Salvar como perfil de voz (Voice Clone)"
+                            style={{ fontSize: 11, marginLeft: 8 }}>★ perfil</button>
+                        )}
                         <button className="muted" onClick={() => exportItem(m.id, !m.exported)}
                           title={m.exported ? 'Remover dos Assets' : 'Exportar p/ Assets'}
                           style={{ fontSize: 11, marginLeft: 8, color: m.exported ? 'var(--success)' : undefined }}>
@@ -578,6 +682,7 @@ export function Sfx() {
               </tbody>
             </table>
           )}
+        </div>
         </div>
       </div>
     </>
