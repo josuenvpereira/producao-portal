@@ -16,6 +16,16 @@ const SEL_KEYS = ['gender', 'age', 'accent', 'pitch', 'style'] as const;
 // fábrica valida contra exatamente isto e devolve 422 estruturado com
 // `validos` se algo sair daqui. Voice Design monta o instruct só por estes
 // dropdowns, então o texto enviado é sempre válido por construção.
+// Tags paralinguísticas do OmniVoice — vocabulário CONFIRMADO no
+// PORTAL_HANDOFF (citado no placeholder histórico). Se a fábrica aceitar
+// mais, adicionar aqui; o handler já é genérico (insere o `tag` no cursor).
+// label = pt-BR no botão; tag = inglês exato que vai pro texto.
+const VOCAL_TAGS: Array<{ tag: string; label: string }> = [
+  { tag: '[laughter]', label: 'risada' },
+  { tag: '[sigh]', label: 'suspiro' },
+  { tag: '[sniff]', label: 'fungada' },
+];
+
 const INSTRUCT_VOCAB: Record<keyof InstructSel, string[]> = {
   gender: ['male', 'female'],
   age: ['child', 'teenager', 'young adult', 'middle-aged', 'elderly'],
@@ -175,6 +185,9 @@ export function Sfx() {
     { tag: 'Speaker_2', sel: EMPTY_SEL, refB64: null, refName: null },
   ]);
   const [vpause, setVpause] = useState(0.3);
+
+  // ref do textarea vocal — usada por insertTag p/ inserir tag no cursor.
+  const vtextRef = useRef<HTMLTextAreaElement>(null);
 
   // poll de status a cada 20s
   const rs = useRef(reloadStatus);
@@ -363,6 +376,27 @@ export function Sfx() {
     }
   }
 
+  // Insere tag (ex.: [laughter]) na posição do cursor no textarea vocal.
+  // Espaços antes/depois são acrescentados só se faltar — não duplica.
+  function insertTag(tag: string): void {
+    const el = vtextRef.current;
+    const start = el?.selectionStart ?? vtext.length;
+    const end = el?.selectionEnd ?? vtext.length;
+    const before = vtext.slice(0, start);
+    const after = vtext.slice(end);
+    const padBefore = before && !/\s$/.test(before) ? ' ' : '';
+    const padAfter = after && !/^\s/.test(after) ? ' ' : '';
+    const piece = `${padBefore}${tag}${padAfter}`;
+    setVtext(before + piece + after);
+    if (el) {
+      const cursor = start + piece.length;
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(cursor, cursor);
+      });
+    }
+  }
+
   // Aplicar perfil = entra em Voice Clone com o áudio salvo + transcrição
   // exata como ref_text. User só digita o NOVO texto e gera com a MESMA voz.
   async function applyProfile(p: SfxProfile) {
@@ -475,10 +509,21 @@ export function Sfx() {
                 ))}
               </div>
 
-              <textarea {...inp} rows={vmode === 'multi' ? 5 : 3}
+              <div className="row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span className="muted" style={{ fontSize: 11 }}>tags:</span>
+                {VOCAL_TAGS.map((t) => (
+                  <button key={t.tag} type="button" className="chip"
+                    title={`insere ${t.tag} na posição do cursor`}
+                    style={{ cursor: 'pointer', fontFamily: 'inherit' }}
+                    onClick={() => insertTag(t.tag)}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <textarea {...inp} ref={vtextRef} rows={vmode === 'multi' ? 5 : 3}
                 placeholder={vmode === 'multi'
                   ? '[Speaker_1]: Bom dia!\n[Speaker_2]: Olá, tudo bem?\n[Speaker_1]: Tudo ótimo.'
-                  : 'texto da narração (aceita tags [laughter] [sigh] [sniff])'}
+                  : 'texto da narração'}
                 value={vtext} onChange={(e) => setVtext(e.target.value)} />
 
               {vmode === 'design' && (
