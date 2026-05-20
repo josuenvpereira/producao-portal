@@ -16,14 +16,27 @@ const SEL_KEYS = ['gender', 'age', 'accent', 'pitch', 'style'] as const;
 // fábrica valida contra exatamente isto e devolve 422 estruturado com
 // `validos` se algo sair daqui. Voice Design monta o instruct só por estes
 // dropdowns, então o texto enviado é sempre válido por construção.
-// Tags paralinguísticas do OmniVoice — vocabulário CONFIRMADO no
-// PORTAL_HANDOFF (citado no placeholder histórico). Se a fábrica aceitar
-// mais, adicionar aqui; o handler já é genérico (insere o `tag` no cursor).
-// label = pt-BR no botão; tag = inglês exato que vai pro texto.
-const VOCAL_TAGS: Array<{ tag: string; label: string }> = [
-  { tag: '[laughter]', label: 'risada' },
-  { tag: '[sigh]', label: 'suspiro' },
-  { tag: '[sniff]', label: 'fungada' },
+// Tags paralinguísticas do OmniVoice — 13 tags oficiais (fonte: README +
+// regex em omnivoice/models/omnivoice.py do repo k2-fsa/OmniVoice). Os
+// sufixos -ah/-oh/-en/-ei/-yi/-wa/-yo/-hnn são variações fonéticas da
+// mesma emoção (vocalização diferente). label = pt-BR; tag = inglês
+// exato (o que vai pro texto, único formato que a fábrica reconhece).
+// `group` = chave de agrupamento visual (separador "·" entre grupos).
+// `[sniff]` foi removido — NÃO está no regex oficial, fábrica ignora.
+const VOCAL_TAGS: Array<{ tag: string; label: string; group: string }> = [
+  { tag: '[laughter]', label: 'risada', group: 'base' },
+  { tag: '[sigh]', label: 'suspiro', group: 'base' },
+  { tag: '[confirmation-en]', label: 'mhm', group: 'conf' },
+  { tag: '[question-en]', label: 'hã?', group: 'pergunta' },
+  { tag: '[question-ah]', label: 'ah?', group: 'pergunta' },
+  { tag: '[question-oh]', label: 'oh?', group: 'pergunta' },
+  { tag: '[question-ei]', label: 'êi?', group: 'pergunta' },
+  { tag: '[question-yi]', label: 'íi?', group: 'pergunta' },
+  { tag: '[surprise-ah]', label: 'ah!', group: 'surpresa' },
+  { tag: '[surprise-oh]', label: 'oh!', group: 'surpresa' },
+  { tag: '[surprise-wa]', label: 'uau!', group: 'surpresa' },
+  { tag: '[surprise-yo]', label: 'yo!', group: 'surpresa' },
+  { tag: '[dissatisfaction-hnn]', label: 'hnnn', group: 'contr' },
 ];
 
 const INSTRUCT_VOCAB: Record<keyof InstructSel, string[]> = {
@@ -511,14 +524,21 @@ export function Sfx() {
 
               <div className="row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span className="muted" style={{ fontSize: 11 }}>tags:</span>
-                {VOCAL_TAGS.map((t) => (
-                  <button key={t.tag} type="button" className="chip"
-                    title={`insere ${t.tag} na posição do cursor`}
-                    style={{ cursor: 'pointer', fontFamily: 'inherit' }}
-                    onClick={() => insertTag(t.tag)}>
-                    {t.label}
-                  </button>
-                ))}
+                {VOCAL_TAGS.map((t, i) => {
+                  const prev = VOCAL_TAGS[i - 1];
+                  const sep = prev && prev.group !== t.group;
+                  return (
+                    <span key={t.tag} style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                      {sep && <span className="muted" style={{ fontSize: 11 }}>·</span>}
+                      <button type="button" className="chip"
+                        title={`insere ${t.tag}`}
+                        style={{ cursor: 'pointer', fontFamily: 'inherit' }}
+                        onClick={() => insertTag(t.tag)}>
+                        {t.label}
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
               <textarea {...inp} ref={vtextRef} rows={vmode === 'multi' ? 5 : 3}
                 placeholder={vmode === 'multi'
