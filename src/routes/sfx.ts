@@ -168,25 +168,33 @@ export async function sfxRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/sfx/profiles',
     {
+      // áudio de referência vai em base64 (até ~12MB raw → ~16MB b64)
+      bodyLimit: 32 * 1024 * 1024,
       schema: {
         body: {
           type: 'object',
-          required: ['fromLibraryId', 'name'],
+          required: ['name', 'refAudioB64', 'refText'],
           properties: {
-            fromLibraryId: { type: 'string', maxLength: 64 },
             name: { type: 'string', minLength: 1, maxLength: 64 },
-            refText: { type: 'string', maxLength: 4000 },
+            refAudioB64: { type: 'string', minLength: 32 },
+            refText: { type: 'string', minLength: 1, maxLength: 4000 },
+            language: { type: ['string', 'null'], maxLength: 16 },
           },
         },
       },
     },
     async (
       req: FastifyRequest<{
-        Body: { fromLibraryId: string; name: string; refText?: string };
+        Body: {
+          name: string;
+          refAudioB64: string;
+          refText: string;
+          language?: string | null;
+        };
       }>,
       reply,
     ) => {
-      const r = createProfile(req.body.fromLibraryId, req.body.name, req.body.refText);
+      const r = createProfile(req.body);
       if ('error' in r) return reply.code(400).send({ error: r.error });
       return r;
     },

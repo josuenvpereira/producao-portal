@@ -328,12 +328,26 @@ export function Sfx() {
     }
   }
 
-  async function saveAsProfile(libraryId: string, suggested: string) {
-    const name = window.prompt('Nome do perfil de voz:', suggested.slice(0, 40).trim());
+  // Salvar perfil = guardar o áudio de referência + transcrição EXATA que
+  // estão no form de Voice Clone, pra reusar depois sem reanexar. Pré: vref
+  // e vrefText preenchidos (a transcrição é o que ancora a clonagem).
+  async function saveAsProfile() {
+    if (!vref) {
+      setErr('Anexe o áudio de referência antes de salvar o perfil.');
+      return;
+    }
+    const text = vrefText.trim();
+    if (!text) {
+      setErr('Marque "tenho a transcrição EXATA" e preencha — sem isso o perfil não funciona.');
+      setVrefTextOn(true);
+      return;
+    }
+    const name = window.prompt('Nome do perfil de voz:', vref.name.replace(/\.\w+$/, ''));
     if (!name || !name.trim()) return;
     try {
-      await api.sfxProfileCreate(libraryId, name.trim());
+      await api.sfxProfileCreate(name.trim(), vref.b64, text, vlang || null);
       reloadProfiles();
+      setErr('');
     } catch (e) {
       setErr(e instanceof ApiError ? friendlyError(e) : 'Falha ao salvar o perfil.');
     }
@@ -499,6 +513,21 @@ export function Sfx() {
                     <input className="input" placeholder="transcrição exata do áudio de referência"
                       value={vrefText} onChange={(e) => setVrefText(e.target.value)} />
                   )}
+                  {vref && (
+                    <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                      <button className="btn" type="button"
+                        title={vrefText.trim()
+                          ? 'Salva este áudio + transcrição como perfil reutilizável'
+                          : 'Preencha a transcrição EXATA primeiro'}
+                        disabled={!vrefText.trim()}
+                        onClick={saveAsProfile}>
+                        ★ Salvar como perfil
+                      </button>
+                      <span className="muted" style={{ fontSize: 11 }}>
+                        salva o par {'{'}áudio + texto{'}'} p/ reusar nas próximas gerações
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -579,16 +608,7 @@ export function Sfx() {
             <div style={{ marginTop: 14 }}>
               <audio controls src={result.url} style={{ width: '100%' }} />
               <div className="row" style={{ marginTop: 8, justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="row" style={{ gap: 8 }}>
-                  <a className="btn" href={result.url} download={`${kind}.mp3`}>baixar</a>
-                  {kind === 'vocal' && result.id && (
-                    <button className="btn" type="button"
-                      title="Salvar este áudio + transcrição como perfil reutilizável (Voice Clone)"
-                      onClick={() => saveAsProfile(result.id!, vtext)}>
-                      ★ Salvar perfil
-                    </button>
-                  )}
-                </div>
+                <a className="btn" href={result.url} download={`${kind}.mp3`}>baixar</a>
                 <span className="muted" style={{ fontSize: 12 }}>salvo na Biblioteca →</span>
               </div>
               {result.promptEn && (
@@ -612,7 +632,7 @@ export function Sfx() {
               <tbody>
                 {profiles.length === 0 && (
                   <tr><td colSpan={4} className="muted">
-                    sem perfis ainda — gere um vocal e clique <b>★ Salvar perfil</b> p/ reusar a voz
+                    sem perfis ainda — em <b>Vocal → Voice Clone</b>, anexe áudio + transcrição e clique <b>★ Salvar como perfil</b>
                   </td></tr>
                 )}
                 {profiles.map((p) => (
@@ -624,8 +644,8 @@ export function Sfx() {
                         {p.language ? ` · ${p.language}` : ''}
                       </div>
                     </td>
-                    <td className="muted" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.sourceText}>
-                      {p.sourceText}
+                    <td className="muted" style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.refText}>
+                      {p.refText}
                     </td>
                     <td>
                       <audio controls preload="none" src={api.sfxProfileAudioUrl(p.id)} style={{ width: 150, height: 32, verticalAlign: 'middle' }} />
@@ -663,11 +683,6 @@ export function Sfx() {
                       <td>
                         <audio controls preload="none" src={api.sfxAudioUrl(m.id)} style={{ width: 170, height: 32, verticalAlign: 'middle' }} />
                         <a className="muted" href={api.sfxAudioUrl(m.id)} download={`${m.id}.mp3`} style={{ fontSize: 11, marginLeft: 6 }}>baixar</a>
-                        {m.kind === 'vocal' && (
-                          <button className="muted" onClick={() => saveAsProfile(m.id, String(r['text'] ?? ''))}
-                            title="Salvar como perfil de voz (Voice Clone)"
-                            style={{ fontSize: 11, marginLeft: 8 }}>★ perfil</button>
-                        )}
                         <button className="muted" onClick={() => exportItem(m.id, !m.exported)}
                           title={m.exported ? 'Remover dos Assets' : 'Exportar p/ Assets'}
                           style={{ fontSize: 11, marginLeft: 8, color: m.exported ? 'var(--success)' : undefined }}>

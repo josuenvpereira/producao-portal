@@ -108,66 +108,59 @@ describe('sfx library — persist/list/anti-traversal', () => {
 });
 
 describe('sfx library — perfis (Voice Clone reutilizável)', () => {
-  it('cria perfil a partir de geração vocal: refText default = texto da geração', () => {
-    const m = lib.saveGeneration(
-      'vocal',
-      { text: 'Olá, sou o Jotaene', language: 'pt' },
-      Buffer.from('AUDIOBYTES'),
-      null,
-    );
-    const p = lib.createProfile(m.id, '  Voz narrador  ');
+  const validB64 = Buffer.from('FAKEAUDIOBYTES_long_enough_to_pass').toString('base64');
+
+  it('cria perfil a partir de áudio b64 + transcrição (input direto)', () => {
+    const p = lib.createProfile({
+      name: '  Voz narrador  ',
+      refAudioB64: validB64,
+      refText: 'Olá, sou o Jotaene',
+      language: 'pt',
+    });
     if ('error' in p) throw new Error('esperava perfil, veio error: ' + p.error);
     expect(p.id).toMatch(/^pid_\d{10,}-[a-f0-9]{8}$/);
     expect(p.name).toBe('Voz narrador'); // trim
-    expect(p.fromLibraryId).toBe(m.id);
-    expect(p.sourceText).toBe('Olá, sou o Jotaene');
-    expect(p.refText).toBe('Olá, sou o Jotaene'); // default = sourceText
+    expect(p.refText).toBe('Olá, sou o Jotaene');
     expect(p.language).toBe('pt');
-    expect(p.audioBytes).toBe(10);
+    expect(p.audioBytes).toBeGreaterThan(0);
 
     const all = lib.listProfiles();
     expect(all.find((x) => x.id === p.id)).toBeTruthy();
-
-    // áudio do perfil é cópia (auto-contido): existe mesmo se apagar o item original
-    expect(lib.profileAudioPath(p.id)).toContain(`${p.id}.profile.mp3`);
-    lib.deleteGeneration(m.id);
     expect(lib.profileAudioPath(p.id)).toContain(`${p.id}.profile.mp3`);
   });
 
-  it('refText custom é respeitado', () => {
-    const m = lib.saveGeneration('vocal', { text: 'AAAA' }, Buffer.from('B'), null);
-    const p = lib.createProfile(m.id, 'X', 'transcrição corrigida');
-    if ('error' in p) throw new Error('esperava perfil');
-    expect(p.refText).toBe('transcrição corrigida');
-  });
-
-  it('falha em kind != vocal', () => {
+  it('listLibrary NÃO inclui perfis (.profile.json) — bug que dava tela preta', () => {
+    // garante que tem um perfil + um item normal coexistindo
+    lib.createProfile({ name: 'P', refAudioB64: validB64, refText: 'oi' });
     const m = lib.saveGeneration('sfx', { prompt: 'vidro' }, Buffer.from('B'), null);
-    const r = lib.createProfile(m.id, 'X');
-    expect('error' in r && r.error).toMatch(/só dá pra fazer perfil de vocal/);
+    const items = lib.listLibrary();
+    expect(items.find((x) => x.id === m.id)).toBeTruthy();
+    // nenhum item da Biblioteca pode ter id começando com pid_
+    expect(items.every((x) => !x.id.startsWith('pid_'))).toBe(true);
+    // e todos têm `req` definido (era o crash do map: r['prompt'] em undefined)
+    expect(items.every((x) => x.req !== undefined)).toBe(true);
   });
 
-  it('falha em vocal sem text', () => {
-    const m = lib.saveGeneration('vocal', { language: 'pt' }, Buffer.from('B'), null);
-    const r = lib.createProfile(m.id, 'X');
-    expect('error' in r && r.error).toMatch(/sem texto/);
+  it('language opcional/vazio vira null', () => {
+    const p = lib.createProfile({ name: 'X', refAudioB64: validB64, refText: 'oi' });
+    if ('error' in p) throw new Error('esperava perfil');
+    expect(p.language).toBeNull();
+    const p2 = lib.createProfile({ name: 'Y', refAudioB64: validB64, refText: 'oi', language: '   ' });
+    if ('error' in p2) throw new Error('esperava perfil');
+    expect(p2.language).toBeNull();
   });
 
-  it('falha em id inválido (anti-traversal) e id inexistente', () => {
-    expect(lib.createProfile('../etc/passwd', 'X')).toEqual({ error: 'id inválido' });
-    expect(lib.createProfile('9999999999-deadbeef', 'X')).toEqual({
-      error: 'item da biblioteca não encontrado',
-    });
-  });
-
-  it('falha em nome vazio', () => {
-    const m = lib.saveGeneration('vocal', { text: 'oi' }, Buffer.from('B'), null);
-    expect(lib.createProfile(m.id, '   ')).toEqual({ error: 'nome do perfil obrigatório' });
+  it('falha em nome vazio / transcrição vazia / áudio ausente', () => {
+    expect(lib.createProfile({ name: '   ', refAudioB64: validB64, refText: 'x' }))
+      .toEqual({ error: 'nome do perfil obrigatório' });
+    expect(lib.createProfile({ name: 'X', refAudioB64: validB64, refText: '   ' }))
+      .toEqual({ error: 'transcrição exata obrigatória' });
+    expect(lib.createProfile({ name: 'X', refAudioB64: '', refText: 'x' }))
+      .toEqual({ error: 'áudio de referência obrigatório' });
   });
 
   it('deleteProfile remove json + mp3; PID_RE barra path-traversal', () => {
-    const m = lib.saveGeneration('vocal', { text: 'oi' }, Buffer.from('B'), null);
-    const p = lib.createProfile(m.id, 'tmp');
+    const p = lib.createProfile({ name: 'tmp', refAudioB64: validB64, refText: 'oi' });
     if ('error' in p) throw new Error('esperava perfil');
     expect(lib.deleteProfile(p.id)).toBe(true);
     expect(lib.profileAudioPath(p.id)).toBeNull();

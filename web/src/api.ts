@@ -66,10 +66,15 @@ export const api = {
       { method: 'POST', body: JSON.stringify({ exported }) },
     ),
   sfxProfiles: () => req<SfxProfile[]>('/sfx/profiles'),
-  sfxProfileCreate: (fromLibraryId: string, name: string, refText?: string) =>
+  sfxProfileCreate: (
+    name: string,
+    refAudioB64: string,
+    refText: string,
+    language?: string | null,
+  ) =>
     req<SfxProfile>('/sfx/profiles', {
       method: 'POST',
-      body: JSON.stringify({ fromLibraryId, name, ...(refText ? { refText } : {}) }),
+      body: JSON.stringify({ name, refAudioB64, refText, language: language ?? null }),
     }),
   sfxProfileDelete: (pid: string) =>
     req<{ ok: true }>(`/sfx/profiles/${encodeURIComponent(pid)}`, { method: 'DELETE' }),
@@ -270,9 +275,7 @@ export interface SfxMeta {
 export interface SfxProfile {
   id: string;
   name: string;
-  fromLibraryId: string;
   kind: 'vocal';
-  sourceText: string;
   refText: string;
   language: string | null;
   createdAt: number;

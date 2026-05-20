@@ -28,17 +28,15 @@ export interface SfxMeta {
   exported?: boolean; // marcado p/ aparecer na aba Assets (read-model)
 }
 
-// Perfil de voz: snapshot reutilizável de uma geração vocal que rodou bem.
-// Auto-contido (mp3 copiado pra <pid>.profile.mp3) — apagar o item original
-// da Biblioteca NÃO quebra o perfil. Aplicar = preencher Voice Clone com
-// ref_audio (o mp3 do perfil) + ref_text (a transcrição exata).
+// Perfil de voz: par {áudio de referência + transcrição exata} salvo pra
+// reusar em Voice Clone sem precisar reanexar tudo de novo. Auto-contido
+// (mp3 gravado em <pid>.profile.mp3). Aplicar = preencher Voice Clone com
+// ref_audio (o mp3) + ref_text (a transcrição). NÃO depende da Biblioteca.
 export interface SfxProfile {
   id: string;            // pid_<ts>-<rand>
   name: string;          // batizado pelo user
-  fromLibraryId: string; // origem (pra rastrear; pode não existir mais)
   kind: 'vocal';
-  sourceText: string;    // texto da geração original (= req.text)
-  refText: string;       // o que vai como ref_text no Voice Clone (default = sourceText)
+  refText: string;       // transcrição EXATA do áudio (vai como ref_text no Clone)
   language: string | null;
   createdAt: number;
   audioBytes: number;
@@ -66,7 +64,9 @@ export function listLibrary(): SfxMeta[] {
   if (!existsSync(LIB)) return [];
   const out: SfxMeta[] = [];
   for (const f of readdirSync(LIB)) {
-    if (!f.endsWith('.json')) continue;
+    // <pid>.profile.json também termina em ".json" — excluir p/ não vazar
+    // perfis na lista da Biblioteca (estouro: m.req=undefined → crash no map).
+    if (!f.endsWith('.json') || f.endsWith('.profile.json')) continue;
     try {
       out.push(JSON.parse(readFileSync(join(LIB, f), 'utf8')) as SfxMeta);
     } catch {
@@ -131,55 +131,51 @@ export function deleteGeneration(id: string): boolean {
 
 // ─────────────── Perfis ───────────────
 
-function isVocalReq(req: unknown): req is { text: string; language?: string | null } {
-  if (!req || typeof req !== 'object') return false;
-  const r = req as Record<string, unknown>;
-  return typeof r['text'] === 'string' && r['text'].trim().length > 0;
+export interface CreateProfileInput {
+  name: string;
+  refAudioB64: string;   // base64 PURO (sem prefixo data:...;base64,)
+  refText: string;       // transcrição exata
+  language?: string | null;
 }
 
 /**
- * Cria um perfil a partir de um item vocal da Biblioteca. Falha se o item
- * não existe, não é vocal, ou não tem `text`. Copia o mp3 pra
- * <pid>.profile.mp3 e grava <pid>.profile.json — perfil é auto-contido.
+ * Cria perfil a partir de áudio + transcrição enviados direto (sem precisar
+ * gerar antes). É o caso real do Voice Clone: "tenho a voz e o texto exato,
+ * quero salvar pra reusar". Auto-contido em <pid>.profile.{json,mp3}.
  */
 export function createProfile(
-  fromLibraryId: string,
-  name: string,
-  refText?: string,
+  input: CreateProfileInput,
 ): SfxProfile | { error: string } {
   ensureDir();
-  if (!ID_RE.test(fromLibraryId)) return { error: 'id inválido' };
-  const srcMeta = join(LIB, `${fromLibraryId}.json`);
-  const srcAudio = join(LIB, `${fromLibraryId}.mp3`);
-  if (!existsSync(srcMeta) || !existsSync(srcAudio)) {
-    return { error: 'item da biblioteca não encontrado' };
-  }
-  let meta: SfxMeta;
-  try {
-    meta = JSON.parse(readFileSync(srcMeta, 'utf8')) as SfxMeta;
-  } catch {
-    return { error: 'metadados corrompidos' };
-  }
-  if (meta.kind !== 'vocal') return { error: 'só dá pra fazer perfil de vocal' };
-  if (!isVocalReq(meta.req)) return { error: 'item vocal sem texto (não dá pra clonar)' };
-  const cleanName = name.trim().slice(0, 64);
+  const cleanName = input.name.trim().slice(0, 64);
   if (!cleanName) return { error: 'nome do perfil obrigatório' };
-  const sourceText = meta.req.text;
-  const language = typeof meta.req.language === 'string' ? meta.req.language : null;
+  const refText = input.refText.trim().slice(0, 4000);
+  if (!refText) return { error: 'transcrição exata obrigatória' };
+  if (!input.refAudioB64 || input.refAudioB64.length < 32) {
+    return { error: 'áudio de referência obrigatório' };
+  }
+  let audio: Buffer;
+  try {
+    audio = Buffer.from(input.refAudioB64, 'base64');
+  } catch {
+    return { error: 'áudio (base64) inválido' };
+  }
+  if (audio.length < 16) return { error: 'áudio de referência muito pequeno' };
+  const language =
+    typeof input.language === 'string' && input.language.trim()
+      ? input.language.trim()
+      : null;
   const pid = `pid_${Math.floor(Date.now() / 1000)}-${randomBytes(4).toString('hex')}`;
-  const audioBytes = readFileSync(srcAudio);
   const profile: SfxProfile = {
     id: pid,
     name: cleanName,
-    fromLibraryId,
     kind: 'vocal',
-    sourceText,
-    refText: (refText ?? sourceText).slice(0, 4000),
+    refText,
     language,
     createdAt: Date.now(),
-    audioBytes: audioBytes.length,
+    audioBytes: audio.length,
   };
-  writeFileSync(join(LIB, `${pid}.profile.mp3`), audioBytes);
+  writeFileSync(join(LIB, `${pid}.profile.mp3`), audio);
   writeFileSync(join(LIB, `${pid}.profile.json`), JSON.stringify(profile, null, 2));
   return profile;
 }
