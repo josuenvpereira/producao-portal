@@ -13,6 +13,7 @@ import 'reactflow/dist/style.css';
 import { api } from '../api';
 import type { OrgManifest, Overview } from '../api';
 import { useApi } from '../hooks';
+import { useRefreshTick } from '../refresh';
 import { Loading } from '../components';
 
 type View = 'squads' | 'agentes';
@@ -268,8 +269,11 @@ function loadPos(v: View): Record<string, { x: number; y: number }> {
 // ── Página ─────────────────────────────────────────────────────────────────
 export function Organograma() {
   const navigate = useNavigate();
-  const { data: org, error } = useApi(() => api.org(), []);
-  const { data: ov } = useApi(() => api.overview(), []);
+  // tick = incrementado pelo SSE no App (após cada reindex periódico, ~30s)
+  // → as duas useApi refetcham e o roster atualiza sem F5.
+  const tick = useRefreshTick();
+  const { data: org, error } = useApi(() => api.org(), [tick]);
+  const { data: ov } = useApi(() => api.overview(), [tick]);
   const [view, setView] = useState<View>('squads');
   const [squadFilter, setSquadFilter] = useState('all');
   const [panelOpen, setPanelOpen] = useState(true);

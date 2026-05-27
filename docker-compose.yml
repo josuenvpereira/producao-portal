@@ -27,6 +27,10 @@ services:
       - ${PORTAL_REPO_DIR}:/repo:ro   # repo do supervisor — SOMENTE LEITURA
       # snapshots do OpenClaw (gerados pelo scripts/openclaw-export.sh no host)
       - ${PORTAL_OPENCLAW_EXPORT_DIR:-/docker/openclaw-0wr6/portal-export}:/openclaw-export:ro
+      # org.json HOT-RELOADABLE: o `git reset --hard origin/main` do CD
+      # atualiza o arquivo no host → container vê na próxima request
+      # (orgManifest() lê sem cache). Não precisa rebuild de imagem.
+      - ./org.json:/app/org.json:ro
     read_only: true                    # rootfs imutável (só /data e /tmp escrevem)
     tmpfs:
       - /tmp
