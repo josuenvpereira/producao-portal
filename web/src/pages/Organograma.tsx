@@ -272,11 +272,29 @@ export function Organograma() {
   // tick = incrementado pelo SSE no App (após cada reindex periódico, ~30s)
   // → as duas useApi refetcham e o roster atualiza sem F5.
   const tick = useRefreshTick();
-  const { data: org, error } = useApi(() => api.org(), [tick]);
-  const { data: ov } = useApi(() => api.overview(), [tick]);
+  const { data: org, error, reload: reloadOrg } = useApi(() => api.org(), [tick]);
+  const { data: ov, reload: reloadOv } = useApi(() => api.overview(), [tick]);
   const [view, setView] = useState<View>('squads');
   const [squadFilter, setSquadFilter] = useState('all');
   const [panelOpen, setPanelOpen] = useState(true);
+  const [reindexing, setReindexing] = useState(false);
+  const [reindexNote, setReindexNote] = useState('');
+
+  async function doReindex(): Promise<void> {
+    setReindexing(true);
+    setReindexNote('');
+    try {
+      const r = await api.adminReindex();
+      reloadOrg();
+      reloadOv();
+      setReindexNote(`atualizado · ${r.episodes} ep · ${r.artifacts} artefato(s)`);
+      setTimeout(() => setReindexNote(''), 4000);
+    } catch {
+      setReindexNote('falha ao atualizar — tente novamente');
+    } finally {
+      setReindexing(false);
+    }
+  }
 
   const base = useMemo(() => {
     if (!org) return { nodes: [] as Node<NodeData>[], edges: [] as Edge[] };
@@ -332,6 +350,13 @@ export function Organograma() {
         <div>
           <h1>Organograma</h1>
           <div className="sub">{org.project ?? 'Pipeline'} — data-driven (openclaw_workspaces/org.json)</div>
+        </div>
+        <div className="row" style={{ gap: 10, alignItems: 'center' }}>
+          {reindexNote && <span className="muted" style={{ fontSize: 12 }}>{reindexNote}</span>}
+          <button className="btn" type="button" onClick={doReindex} disabled={reindexing}
+            title="Força um reindex no servidor + recarrega o organograma (re-lê org.json e todas as fontes)">
+            {reindexing ? 'atualizando…' : '🔄 Atualizar agora'}
+          </button>
         </div>
       </div>
 

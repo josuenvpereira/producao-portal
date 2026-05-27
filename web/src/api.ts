@@ -79,6 +79,15 @@ export const api = {
   sfxProfileDelete: (pid: string) =>
     req<{ ok: true }>(`/sfx/profiles/${encodeURIComponent(pid)}`, { method: 'DELETE' }),
   sfxProfileAudioUrl: (pid: string) => `/api/sfx/profiles/${encodeURIComponent(pid)}/audio`,
+
+  // Atualização sob demanda — dispara reindex no backend e devolve o resumo.
+  // Após retorno, o SSE notifica todas as páginas (last_sync mudou).
+  adminReindex: () =>
+    req<{ ok: true; episodes: number; runs: number; artifacts: number;
+          crons: number; cronRuns: number; agentUsage: number; degraded: string[] }>(
+      '/admin/reindex',
+      { method: 'POST' },
+    ),
   async sfxGenerate(
     kind: 'sfx' | 'bed' | 'vocal',
     body: Record<string, unknown>,

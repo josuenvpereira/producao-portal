@@ -9,6 +9,7 @@ import {
   esteira,
   orgManifest,
 } from '../db/queries.js';
+import { runIndexer } from '../indexer.js';
 
 // Endpoints read-only. Registrados em escopo protegido (requireAuth).
 export async function apiRoutes(app: FastifyInstance): Promise<void> {
@@ -39,4 +40,13 @@ export async function apiRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/assets', async () => assetsList(app.db));
   app.get('/api/esteira', async () => esteira(app.db));
   app.get('/api/org', async () => orgManifest());
+
+  // Atualização sob demanda — força um reindex e responde com o resumo.
+  // Já é re-entrancy-safe (guard `inFlight` em indexer.ts): cliques
+  // concorrentes compartilham o mesmo Promise, sem duplicar trabalho.
+  // O SSE de /api/stream também notifica em até ~4s (last_sync mudou).
+  app.post('/api/admin/reindex', async () => {
+    const r = await runIndexer();
+    return { ok: true, ...r };
+  });
 }
