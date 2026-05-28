@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import type { Db } from './db.js';
 import { getMeta } from './db.js';
 import { config } from '../config.js';
+import { readOpenclawAgents } from '../adapters/openclawAgents.js';
+import type { OpenclawAgent } from '../adapters/openclawAgents.js';
 
 // Queries do read-model → shapes prontos pro frontend. Tudo read-only.
 
@@ -276,11 +278,137 @@ export function esteira(db: Db) {
   return { pipeline, agents, episodes, degraded: degradedNotes(db) };
 }
 
-export function orgManifest(): unknown {
-  // org.json roster-driven, versionado na raiz deste repo (standalone).
+// ───────────── Organograma ─────────────
+// Estratégia: roster VIVO do OpenClaw (agents.json do exporter) — quando
+// disponível, vira a fonte da verdade. Mescla com org.json estático pra
+// preservar metadados que o OpenClaw não tem (pipeline canônico do MSU,
+// handsOffTo explícitos, project name). Sem agents.json → fallback puro
+// pro org.json estático (zero regressão durante migração).
+
+interface StaticAgent {
+  id: string;
+  branch?: string;
+  emoji?: string;
+  name?: string;
+  role?: string;
+  model?: string;
+  lead?: boolean;
+  handsOffTo?: string[];
+}
+interface StaticSquad { id: string; name: string; agents?: StaticAgent[] }
+interface StaticManifest {
+  schemaVersion?: number;
+  generatedAt?: string;
+  project?: string;
+  ceo?: StaticAgent;
+  pipeline?: string[];
+  states?: string[];
+  squads?: StaticSquad[];
+}
+
+// Squads conhecidas — id, label e regra de detecção pelo sufixo do id do
+// agente. Ordem do array = ordem de exibição. Agente que não cai em
+// nenhuma squad conhecida vai pra "outros" (silenciosamente).
+const SQUAD_DEFS: Array<{ id: string; name: string; match: (id: string) => boolean }> = [
+  { id: 'conteudo',  name: 'Conteúdo · Mensageria',     match: (id) => id.endsWith('-com') },
+  { id: 'canal_msu', name: 'Canal MSU · Vídeo',         match: (id) => id.endsWith('-msu') },
+  { id: 'dev',       name: 'Desenvolvimento · Produto', match: (id) => id.endsWith('-dev') },
+];
+const SQUAD_OUTROS = { id: 'outros', name: 'Outros' };
+
+function squadOf(agentId: string): { id: string; name: string } {
+  for (const s of SQUAD_DEFS) if (s.match(agentId)) return { id: s.id, name: s.name };
+  return SQUAD_OUTROS;
+}
+
+// "⚡ (raio — assinatura oficial)" → "⚡"; null/'' → '•'.
+function cleanEmoji(raw: string | null): string {
+  const head = (raw ?? '').split(/[\s(]/)[0]?.trim();
+  return head || '•';
+}
+
+function readStaticManifest(): StaticManifest | null {
   try {
-    return JSON.parse(readFileSync(config.org.manifestPath, 'utf8'));
+    return JSON.parse(readFileSync(config.org.manifestPath, 'utf8')) as StaticManifest;
   } catch {
-    return { schemaVersion: 1, squads: [], degraded: ['org.json ausente — rode scripts/generate_org_manifest.js'] };
+    return null;
   }
+}
+
+// Constrói o manifest a partir do roster VIVO (agents.json) + metadados
+// herdados do static (pipeline, handsOffTo, role bonito quando existir).
+function buildLiveManifest(
+  live: OpenclawAgent[],
+  staticM: StaticManifest | null,
+): StaticManifest & { source: 'openclaw-live' } {
+  // Lookup do static por id pra herdar role/handsOffTo/lead/branch quando
+  // o agente já é conhecido lá.
+  const staticById = new Map<string, StaticAgent>();
+  for (const sq of staticM?.squads ?? []) {
+    for (const a of sq.agents ?? []) staticById.set(a.id, a);
+  }
+  if (staticM?.ceo) staticById.set(staticM.ceo.id, staticM.ceo);
+
+  const toAgent = (a: OpenclawAgent): StaticAgent => {
+    const fromStatic = staticById.get(a.id) ?? {} as StaticAgent;
+    return {
+      id: a.id,
+      branch: fromStatic.branch ?? a.id,
+      emoji: cleanEmoji(a.identityEmoji) !== '•' ? cleanEmoji(a.identityEmoji) : (fromStatic.emoji ?? '•'),
+      name: a.identityName ?? fromStatic.name ?? a.name ?? a.id,
+      role: fromStatic.role ?? a.identityName ?? a.id,
+      model: a.model ?? fromStatic.model ?? '',
+      // Heurística simples: id começa com `gerente-` ou tem bindings>0.
+      // Static `lead` explícito vence se já estiver definido.
+      lead: fromStatic.lead ?? (a.id.startsWith('gerente-') || a.bindings > 0),
+      handsOffTo: fromStatic.handsOffTo ?? [],
+    };
+  };
+
+  // Separa CEO (isDefault ou id === 'main') do resto.
+  const ceoLive = live.find((a) => a.isDefault) ?? live.find((a) => a.id === 'main');
+  const ceo: StaticAgent | undefined = ceoLive
+    ? toAgent(ceoLive)
+    : staticM?.ceo;
+
+  // Agrupa o restante por squad (ordem fixa do SQUAD_DEFS, depois 'outros').
+  const buckets = new Map<string, { id: string; name: string; agents: StaticAgent[] }>();
+  for (const sq of [...SQUAD_DEFS, SQUAD_OUTROS]) {
+    buckets.set(sq.id, { id: sq.id, name: sq.name, agents: [] });
+  }
+  for (const a of live) {
+    if (a === ceoLive) continue; // CEO sai do grupo
+    const sq = squadOf(a.id);
+    buckets.get(sq.id)!.agents.push(toAgent(a));
+  }
+  // Só exibe squads que têm agente.
+  const squads = [...buckets.values()].filter((s) => s.agents.length > 0);
+
+  return {
+    schemaVersion: 2,
+    generatedAt: new Date().toISOString(),
+    project: staticM?.project ?? 'Pipeline',
+    ceo,
+    pipeline: staticM?.pipeline ?? [], // ordem canônica do MSU vem do static
+    states: staticM?.states ?? [],
+    squads,
+    source: 'openclaw-live',
+  };
+}
+
+export function orgManifest(): unknown {
+  // 1) Tenta roster VIVO do OpenClaw (exporter).
+  const liveSnap = readOpenclawAgents(config.openclaw.exportDir);
+  const staticM = readStaticManifest();
+  if (liveSnap) {
+    return buildLiveManifest(liveSnap.agents, staticM);
+  }
+  // 2) Fallback: org.json estático (versionado).
+  if (staticM) return staticM;
+  // 3) Nada — degrada com aviso.
+  return {
+    schemaVersion: 1,
+    squads: [],
+    degraded: ['org.json ausente e agents.json não encontrado'],
+  };
 }

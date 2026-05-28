@@ -31,8 +31,10 @@ put() { # put <arquivo> < conteúdo(stdin)
 
 mkdir -p "$OUT"
 
-# 1. agentes (texto — parser tolera) e crons (JSON rico)
-oc agents list | put agents.txt
+# 1. agentes (JSON — fonte VIVA do roster do organograma; o portal lê isto
+#    e monta squads/CEO dinamicamente, com fallback p/ org.json estático)
+#    e crons (JSON rico)
+oc agents list --json | put agents.json
 oc cron list --all --json | put cron.json
 
 # 2. histórico de execução por job (= esteira de Comunicação)
